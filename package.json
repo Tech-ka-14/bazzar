@@ -1,0 +1,80 @@
+{
+  "name": "bazzar-terminal",
+  "productName": "Bazzar Terminal",
+  "version": "1.1.0",
+  "description": "Bazzar Terminal - Windows desktop financial terminal built from the Bazzar repository",
+  "author": "Bazzar",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "start": "electron .",
+    "prepare:icon": "node scripts/prepare-icon.cjs",
+    "prepare:payload": "node scripts/prepare-payload.cjs",
+    "dist": "npm run build && npm run prepare:icon && npm run prepare:payload && electron-builder",
+    "dist:win": "npm run build && npm run prepare:icon && npm run prepare:payload && electron-builder --win --x64",
+    "dist:win:dir": "npm run build && npm run prepare:icon && npm run prepare:payload && electron-builder --win --x64 --dir -c.win.signAndEditExecutable=false",
+    "dist:win:nsis": "npm run dist:win:dir && node scripts/build-nsis.cjs"
+  },
+  "dependencies": {
+    "lightweight-charts": "^4.2.0",
+    "lucide-react": "^0.454.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.3",
+    "autoprefixer": "^10.4.20",
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.15",
+    "vite": "^5.4.11"
+  },
+  "build": {
+    "appId": "com.bazzar.terminal",
+    "productName": "Bazzar Terminal",
+    "artifactName": "Bazzar Terminal Setup ${version}.${ext}",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "icon": "build/icon.ico",
+    "files": [
+      "dist/**",
+      "electron/**",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "build/repository",
+        "to": "repository",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Bazzar Terminal"
+    }
+  }
+}
