@@ -10,6 +10,7 @@
 //                        electron/update-manifest.json (or the optional remote
 //                        manifest at BAZZAR_UPDATE_MANIFEST_URL)
 const { app, BrowserWindow, ipcMain } = require('electron');
+const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 const http = require('http');
@@ -595,6 +596,68 @@ async function checkForUpdates() {
 }
 
 // ---------------------------------------------------------------------------
+// Python data-backend sidecar (DuckDB + FastAPI; see backend/ and SPEC v1.2.0)
+// The sidecar serves the local market-data API (default http://127.0.0.1:8787)
+// and matplotlib-rendered charts. It is best-effort: if Python or the backend
+// package is unavailable the renderer simply shows its "awaiting data sync"
+// states. Set BAZZAR_BACKEND=0 to disable, BAZZAR_PYTHON to override the
+// interpreter.
+// ---------------------------------------------------------------------------
+
+let backendProcess = null;
+
+// Locate a directory that contains the backend package (packaged payload or
+// the development repository root).
+function backendWorkingDir() {
+  const candidates = [
+    process.resourcesPath ? path.join(process.resourcesPath, 'repository') : null,
+    path.join(__dirname, '..'),
+  ];
+  for (const dir of candidates) {
+    if (!dir) continue;
+    try {
+      if (fs.statSync(path.join(dir, 'backend', 'server.py')).isFile()) return dir;
+    } catch {
+      /* candidate not present */
+    }
+  }
+  return null;
+}
+
+function startBackendSidecar() {
+  if (process.env.BAZZAR_BACKEND === '0' || backendProcess) return;
+  const cwd = backendWorkingDir();
+  if (!cwd) return;
+  const python =
+    process.env.BAZZAR_PYTHON || (process.platform === 'win32' ? 'python' : 'python3');
+  try {
+    backendProcess = spawn(python, ['-m', 'backend.server'], {
+      cwd,
+      stdio: 'ignore',
+      windowsHide: true,
+    });
+    backendProcess.on('exit', () => {
+      backendProcess = null;
+    });
+    backendProcess.on('error', () => {
+      backendProcess = null; // Python not installed: UI stays in sync-pending state
+    });
+  } catch {
+    backendProcess = null;
+  }
+}
+
+function stopBackendSidecar() {
+  if (!backendProcess) return;
+  try {
+    backendProcess.kill();
+  } catch {
+    /* already gone */
+  }
+  backendProcess = null;
+}
+
+// ---------------------------------------------------------------------------
 // Window + IPC wiring
 // ---------------------------------------------------------------------------
 
@@ -691,6 +754,9 @@ app.whenReady().then(() => {
   // Update notification IPC.
   ipcMain.handle('update:check', () => checkForUpdates());
 
+  // Local data backend (best effort; tolerant of missing Python).
+  startBackendSidecar();
+
   createWindow();
 
   app.on('activate', () => {
@@ -700,4 +766,8 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
+});
+
+app.on('will-quit', () => {
+  stopBackendSidecar();
 });

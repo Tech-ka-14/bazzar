@@ -151,3 +151,45 @@ requirements.txt       Python third-party dependencies
 go.mod                 Go scraper dependency manifest (source-only)
 SPEC.md                Product/installer specification
 ```
+
+## Data platform (v1.2.0)
+
+Version 1.2.0 adds a local Python data layer that replaces all dummy data and
+the TradingView/lightweight-charts components:
+
+- **DuckDB storage** — the entire database is created from a single
+  configuration file, `backend/db_config.json` (tables, the full NSE/BSE/MCX
+  index universe, the macro-indicator registry, and the fetch policy).
+  Bootstrap it with `python -m backend.db`.
+- **OpenAlgo (Motilal Oswal) market data** — `backend/openalgo_client.py`
+  talks to a self-hosted OpenAlgo server. Per the broker docs, credentials go
+  in a local `.env` (copy `.env.example`): `BROKER_API_KEY` is your Motilal
+  client code and `BROKER_API_SECRET` is the generated API key. `.env` is
+  gitignored — credentials are never committed.
+- **Daily timeframe only** — to respect API rate limits, only daily (`D`)
+  candles are fetched, in strict alphabetical symbol order, with a
+  `fetch_checkpoint` table so an interrupted pull resumes where it stopped
+  (`python -m backend.fetch_daily`, `python -m backend.fetch_indices`).
+- **Local Python charts** — charts are rendered locally with matplotlib
+  (`backend/charts.py`) and served as PNGs by the FastAPI server
+  (`python -m backend.server`, default `http://127.0.0.1:8787`). The Electron
+  shell spawns this sidecar automatically when Python is available
+  (`BAZZAR_BACKEND=0` disables it).
+- **New tabs** — **Benchmarks** (RBI G-Sec, US Treasury 10Y, SGB, RBI vs US
+  Fed repo rates, plus macro/micro economic indicators with official sources)
+  and **Indices** (the full index universe with OHLC and year low/high). The
+  homepage index cards show the current value, pointwise change, and
+  percentage change, and every stock search box uses dictionary-method
+  search prediction (`/api/search`).
+
+Setup:
+
+```bash
+python -m venv .venv && . .venv/bin/activate   # or .venv\Scripts\activate on Windows
+pip install -r requirements.txt
+cp .env.example .env                            # fill in your OpenAlgo credentials
+python -m backend.db                            # create the DuckDB database
+python -m backend.fetch_indices                 # sync index data (daily)
+python -m backend.server                        # serve the local API + charts
+npm run dev                                     # renderer (browser mode)
+```
