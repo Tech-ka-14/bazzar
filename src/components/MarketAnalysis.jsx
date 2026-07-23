@@ -1,39 +1,64 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { theme } from '../theme.js';
-import { generateMockOHLC, toLineData } from '../mockData.js';
-import ChartDashboard from './ChartDashboard.jsx';
-import USDINRChart from './USDINRChart.jsx';
-import RBIBondsChart from './RBIBondsChart.jsx';
-import RepoRatesChart from './RepoRatesChart.jsx';
-import SGBChart from './SGBChart.jsx';
-import USTreasuryBondsChart from './USTreasuryBondsChart.jsx';
+import { chartUrl } from '../api.js';
+import SearchInput from './SearchInput.jsx';
+import ChartImage from './ChartImage.jsx';
 import IndexContribution from './IndexContribution.jsx';
 
-// Market Analysis page: renders the terminal's chart components against
-// deterministic mock data until a live data backend is connected.
+// Market Analysis page: backend-rendered chart cards only. Benchmark charts
+// (RBI bonds, US Treasury, SGB, repo rates) now live on the Benchmarks page.
 export default function MarketAnalysis() {
-  const primaryData = useMemo(() => generateMockOHLC({ startPrice: 150, seed: 7 }), []);
-  const comparisonData = useMemo(() => generateMockOHLC({ startPrice: 140, seed: 21 }), []);
-  const usdinrData = useMemo(() => generateMockOHLC({ startPrice: 83, seed: 3 }), []);
-  const rbiBondData = useMemo(() => toLineData(generateMockOHLC({ startPrice: 7.2, seed: 11 })), []);
-  const usTreasuryData = useMemo(() => toLineData(generateMockOHLC({ startPrice: 4.4, seed: 13 })), []);
-  const sgbData = useMemo(() => generateMockOHLC({ startPrice: 6200, seed: 17 }), []);
-  const indiaRepoData = useMemo(() => toLineData(generateMockOHLC({ startPrice: 6.5, seed: 23 })), []);
-  const usFedData = useMemo(() => toLineData(generateMockOHLC({ startPrice: 5.4, seed: 29 })), []);
-
   return (
     <div className="space-y-8">
-      <ChartDashboard data={primaryData} comparisonData={comparisonData} />
-      <USDINRChart data={usdinrData} />
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-        <RBIBondsChart data={rbiBondData} />
-        <USTreasuryBondsChart data={usTreasuryData} />
-      </div>
-      <SGBChart data={sgbData} />
-      <RepoRatesChart indiaRepoData={indiaRepoData} usFedData={usFedData} />
+      <ChartViewer />
+      <UsdInrCard />
       <IndexContribution />
       <AppInfoCard />
     </div>
+  );
+}
+
+// Compact chart viewer: pick any stock or index via dictionary search and
+// view its backend matplotlib PNG chart.
+function ChartViewer() {
+  const [selection, setSelection] = useState(null);
+
+  return (
+    <section className={theme.card}>
+      <h3 className={`text-xl mb-4 ${theme.goldText}`}>Chart Viewer</h3>
+      <SearchInput
+        className="max-w-md mb-4"
+        placeholder="Search any stock or index..."
+        onSelect={(item) => setSelection(item)}
+      />
+      {selection ? (
+        <>
+          <p className="text-sm text-gray-400 mb-2">
+            {selection.name} ({selection.symbol}{selection.exchange ? ` · ${selection.exchange}` : ''})
+          </p>
+          <ChartImage
+            src={chartUrl('stocks', selection.symbol, selection.exchange ? { exchange: selection.exchange } : {})}
+            alt={`${selection.symbol} chart`}
+          />
+        </>
+      ) : (
+        <p className="text-gray-500 text-sm">Search for a symbol above to load its chart.</p>
+      )}
+    </section>
+  );
+}
+
+// USDINR currency pair card backed by the renderer contract chart endpoint.
+// Shows a graceful empty state until the backend has CDS data synced.
+function UsdInrCard() {
+  return (
+    <section className={theme.card}>
+      <h3 className={`text-xl mb-4 ${theme.goldText}`}>USDINR</h3>
+      <ChartImage
+        src={chartUrl('stocks', 'USDINR', { exchange: 'CDS' })}
+        alt="USDINR currency pair chart"
+      />
+    </section>
   );
 }
 

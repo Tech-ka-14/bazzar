@@ -1,7 +1,7 @@
 {
   "name": "bazzar-terminal",
   "productName": "Bazzar Terminal",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Bazzar Terminal - Windows desktop financial terminal built from the Bazzar repository",
   "author": "Bazzar",
   "license": "MIT",
@@ -21,7 +21,6 @@
     "dist:win:nsis": "npm run dist:win:dir && node scripts/build-nsis.cjs"
   },
   "dependencies": {
-    "lightweight-charts": "^4.2.0",
     "lucide-react": "^0.454.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"

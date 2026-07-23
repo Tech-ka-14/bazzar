@@ -1,13 +1,35 @@
 import React, { useState } from 'react';
 import { theme } from '../theme.js';
+import SearchInput from './SearchInput.jsx';
+
+const MAX_WATCHLIST_STOCKS = 50;
 
 export default function Equity() {
   const tabs = ['Watchlist', 'NSE', 'BSE', 'Recommendations', 'Results', 'Top Gainers', 'Top Losers', 'Volume Shockers'];
   const [activeTab, setActiveTab] = useState('Watchlist');
   const [activeWatchlist, setActiveWatchlist] = useState('Watchlist 1');
+  // Local state: watchlist name -> array of { symbol, name, exchange }.
+  const [watchlistStocks, setWatchlistStocks] = useState({});
 
   // Initialize 20 renamable watchlists
   const watchlists = Array.from({ length: 20 }, (_, i) => `Watchlist ${i + 1}`);
+  const currentStocks = watchlistStocks[activeWatchlist] || [];
+
+  const handleAddStock = (item) => {
+    setWatchlistStocks((prev) => {
+      const list = prev[activeWatchlist] || [];
+      if (list.length >= MAX_WATCHLIST_STOCKS) return prev;
+      if (list.some((entry) => entry.symbol === item.symbol)) return prev;
+      return { ...prev, [activeWatchlist]: [...list, item] };
+    });
+  };
+
+  const handleRemoveStock = (symbol) => {
+    setWatchlistStocks((prev) => ({
+      ...prev,
+      [activeWatchlist]: (prev[activeWatchlist] || []).filter((entry) => entry.symbol !== symbol),
+    }));
+  };
 
   return (
     <div>
@@ -30,9 +52,34 @@ export default function Equity() {
             >
               {watchlists.map((w) => <option key={w} value={w}>{w}</option>)}
             </select>
-            <span className="text-gray-400 text-sm">Max 50 stocks per list</span>
+            <span className="text-gray-400 text-sm">
+              {currentStocks.length} / {MAX_WATCHLIST_STOCKS} stocks
+            </span>
           </div>
-          <p className="text-gray-500">Stock list rendering here... (Ready for graph API integration)</p>
+          <SearchInput
+            className="max-w-md mb-4"
+            placeholder={`Add a stock to ${activeWatchlist}...`}
+            onSelect={handleAddStock}
+          />
+          {currentStocks.length === 0 ? (
+            <p className="text-gray-500">No stocks yet. Search above to add stocks to this watchlist.</p>
+          ) : (
+            <ul className="space-y-2">
+              {currentStocks.map((stock) => (
+                <li key={stock.symbol} className="flex items-center justify-between bg-gray-800 p-2 rounded text-sm">
+                  <span className="font-bold text-yellow-500">{stock.symbol}</span>
+                  <span className="flex-1 text-gray-300 truncate px-3">{stock.name}</span>
+                  <span className="text-xs text-gray-500 mr-3">{stock.exchange}</span>
+                  <button
+                    onClick={() => handleRemoveStock(stock.symbol)}
+                    className="text-xs text-gray-400 hover:text-red-500 border border-gray-700 rounded px-2 py-1"
+                  >
+                    Remove
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
 

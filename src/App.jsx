@@ -5,6 +5,8 @@ import Equity from './components/Equity.jsx';
 import Commodities from './components/Commodities.jsx';
 import Currency from './components/Currency.jsx';
 import MarketAnalysis from './components/MarketAnalysis.jsx';
+import Benchmarks from './components/Benchmarks.jsx';
+import Indices from './components/Indices.jsx';
 import InternationalMarkets from './components/InternationalMarkets.jsx';
 import Scraper from './components/Scraper.jsx';
 
@@ -24,6 +26,8 @@ export default function App() {
         {activePage === 'Commodities' && <Commodities />}
         {activePage === 'Currency' && <Currency />}
         {activePage === 'Market Analysis' && <MarketAnalysis />}
+        {activePage === 'Benchmarks' && <Benchmarks />}
+        {activePage === 'Indices' && <Indices />}
         {activePage === 'International Markets' && <InternationalMarkets />}
         {activePage === 'Scraper' && <Scraper />}
       </main>
@@ -90,7 +94,7 @@ function Login({ onLogin }) {
 
 // --- Topbar Navigation ---
 function Topbar({ activePage, setActivePage }) {
-  const pages = ['Home', 'Equity', 'Commodities', 'Currency', 'Market Analysis', 'International Markets', 'Scraper'];
+  const pages = ['Home', 'Equity', 'Commodities', 'Currency', 'Market Analysis', 'Benchmarks', 'Indices', 'International Markets', 'Scraper'];
   return (
     <nav className="bg-gray-900 border-b-2 border-yellow-500 p-4 flex gap-6 overflow-x-auto">
       {pages.map((page) => (
