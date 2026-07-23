@@ -1,0 +1,1293 @@
+{
+  "database": {
+    "path": "data/bazzar.duckdb"
+  },
+  "tables": {
+    "securities": {
+      "columns": [
+        {
+          "name": "symbol",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "exchange",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "instrument_type",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "isin",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "active",
+          "type": "BOOLEAN"
+        }
+      ],
+      "primary_key": [
+        "symbol",
+        "exchange"
+      ]
+    },
+    "daily_ohlcv": {
+      "columns": [
+        {
+          "name": "symbol",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "exchange",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "date",
+          "type": "DATE"
+        },
+        {
+          "name": "open",
+          "type": "DOUBLE"
+        },
+        {
+          "name": "high",
+          "type": "DOUBLE"
+        },
+        {
+          "name": "low",
+          "type": "DOUBLE"
+        },
+        {
+          "name": "close",
+          "type": "DOUBLE"
+        },
+        {
+          "name": "volume",
+          "type": "BIGINT"
+        }
+      ],
+      "primary_key": [
+        "symbol",
+        "exchange",
+        "date"
+      ]
+    },
+    "index_master": {
+      "columns": [
+        {
+          "name": "symbol",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "exchange",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "category",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "active",
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "sort_order",
+          "type": "INTEGER"
+        }
+      ],
+      "primary_key": [
+        "symbol"
+      ]
+    },
+    "index_daily": {
+      "columns": [
+        {
+          "name": "symbol",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "date",
+          "type": "DATE"
+        },
+        {
+          "name": "open",
+          "type": "DOUBLE"
+        },
+        {
+          "name": "high",
+          "type": "DOUBLE"
+        },
+        {
+          "name": "low",
+          "type": "DOUBLE"
+        },
+        {
+          "name": "close",
+          "type": "DOUBLE"
+        }
+      ],
+      "primary_key": [
+        "symbol",
+        "date"
+      ]
+    },
+    "macro_series": {
+      "columns": [
+        {
+          "name": "key",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "title",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "category",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "unit",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "frequency",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "source",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "source_url",
+          "type": "VARCHAR"
+        }
+      ],
+      "primary_key": [
+        "key"
+      ]
+    },
+    "macro_observations": {
+      "columns": [
+        {
+          "name": "series_key",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "period",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "value",
+          "type": "DOUBLE"
+        }
+      ],
+      "primary_key": [
+        "series_key",
+        "period"
+      ]
+    },
+    "benchmark_series": {
+      "columns": [
+        {
+          "name": "key",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "unit",
+          "type": "VARCHAR"
+        }
+      ],
+      "primary_key": [
+        "key"
+      ]
+    },
+    "benchmark_observations": {
+      "columns": [
+        {
+          "name": "series_key",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "date",
+          "type": "DATE"
+        },
+        {
+          "name": "value",
+          "type": "DOUBLE"
+        }
+      ],
+      "primary_key": [
+        "series_key",
+        "date"
+      ]
+    },
+    "fetch_checkpoint": {
+      "columns": [
+        {
+          "name": "job",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "last_symbol",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP"
+        }
+      ],
+      "primary_key": [
+        "job"
+      ]
+    }
+  },
+  "fetch_policy": {
+    "interval": "D",
+    "timeframe_note": "daily only \u2014 no smaller timeframe is ever requested (rate-limit policy)",
+    "alphabetical_order": true,
+    "requests_per_minute": 60,
+    "checkpoint_table": "fetch_checkpoint"
+  },
+  "indices": [
+    {
+      "symbol": "BASMTR",
+      "name": "BASMTR",
+      "exchange": "BSE_INDEX",
+      "category": "broad",
+      "sort_order": 1
+    },
+    {
+      "symbol": "BHRT22",
+      "name": "BHRT22",
+      "exchange": "BSE_INDEX",
+      "category": "thematic",
+      "sort_order": 2
+    },
+    {
+      "symbol": "BSE 1000",
+      "name": "BSE 1000",
+      "exchange": "BSE_INDEX",
+      "category": "broad",
+      "sort_order": 3
+    },
+    {
+      "symbol": "BSE 200",
+      "name": "BSE 200",
+      "exchange": "BSE_INDEX",
+      "category": "broad",
+      "sort_order": 4
+    },
+    {
+      "symbol": "BSE 200 EQUAL WEIGHT",
+      "name": "BSE 200 EQUAL WEIGHT",
+      "exchange": "BSE_INDEX",
+      "category": "strategy",
+      "sort_order": 5
+    },
+    {
+      "symbol": "BSE 500",
+      "name": "BSE 500",
+      "exchange": "BSE_INDEX",
+      "category": "broad",
+      "sort_order": 6
+    },
+    {
+      "symbol": "BSE 500 DIVIDEND LEADERS 50",
+      "name": "BSE 500 DIVIDEND LEADERS 50",
+      "exchange": "BSE_INDEX",
+      "category": "strategy",
+      "sort_order": 7
+    },
+    {
+      "symbol": "BSE 500 MOMENTUM 50",
+      "name": "BSE 500 MOMENTUM 50",
+      "exchange": "BSE_INDEX",
+      "category": "strategy",
+      "sort_order": 8
+    },
+    {
+      "symbol": "BSE 500 QUALITY 50",
+      "name": "BSE 500 QUALITY 50",
+      "exchange": "BSE_INDEX",
+      "category": "strategy",
+      "sort_order": 9
+    },
+    {
+      "symbol": "BSE AUTO",
+      "name": "BSE AUTO",
+      "exchange": "BSE_INDEX",
+      "category": "sectoral",
+      "sort_order": 10
+    },
+    {
+      "symbol": "BSE BANKEX",
+      "name": "BSE BANKEX",
+      "exchange": "BSE_INDEX",
+      "category": "sectoral",
+      "sort_order": 11
+    },
+    {
+      "symbol": "BSE CAPGOOD",
+      "name": "BSE CAPGOOD",
+      "exchange": "BSE_INDEX",
+      "category": "sectoral",
+      "sort_order": 12
+    },
+    {
+      "symbol": "BSE CAPITAL MARKETS & INSURANCE",
+      "name": "BSE CAPITAL MARKETS & INSURANCE",
+      "exchange": "BSE_INDEX",
+      "category": "sectoral",
+      "sort_order": 13
+    },
+    {
+      "symbol": "BSE CARBON",
+      "name": "BSE CARBON",
+      "exchange": "BSE_INDEX",
+      "category": "thematic",
+      "sort_order": 14
+    },
+    {
+      "symbol": "BSE CONSDUR",
+      "name": "BSE CONSDUR",
+      "exchange": "BSE_INDEX",
+      "category": "sectoral",
+      "sort_order": 15
+    },
+    {
+      "symbol": "BSE CPSE",
+      "name": "BSE CPSE",
+      "exchange": "BSE_INDEX",
+      "category": "thematic",
+      "sort_order": 16
+    },
+    {
+      "symbol": "BSE DOL100",
+      "name": "BSE DOL100",
+      "exchange": "BSE_INDEX",
+      "category": "broad",
+      "sort_order": 17
+    },
+    {
+      "symbol": "BSE DOL200",
+      "name": "BSE DOL200",
+      "exchange": "BSE_INDEX",
+      "category": "broad",
+      "sort_order": 18
+    },
+    {
+      "symbol": "BSE DOL30",
+      "name": "BSE DOL30",
+      "exchange": "BSE_INDEX",
+      "category": "broad",
+      "sort_order": 19
+    },
+    {
+      "symbol": "BSE FMCG",
+      "name": "BSE FMCG",
+      "exchange": "BSE_INDEX",
+      "category": "sectoral",
+      "sort_order": 20
+    },
+    {
+      "symbol": "BSE FOCUSED IT",
+      "name": "BSE FOCUSED IT",
+      "exchange": "BSE_INDEX",
+      "category": "strategy",
+      "sort_order": 21
+    },
+    {
+      "symbol": "BSE FOCUSED MIDCAP",
+      "name": "BSE FOCUSED MIDCAP",
+      "exchange": "BSE_INDEX",
+      "category": "strategy",
+      "sort_order": 22
+    },
+    {
+      "symbol": "BSE GREENX",
+      "name": "BSE GREENX",
+      "exchange": "BSE_INDEX",
+      "category": "thematic",
+      "sort_order": 23
+    },
+    {
+      "symbol": "BSE HEALTHC",
+      "name": "BSE HEALTHC",
+      "exchange": "BSE_INDEX",
+      "category": "sectoral",
+      "sort_order": 24
+    },
+    {
+      "symbol": "BSE INDIA 150",
+      "name": "BSE INDIA 150",
+      "exchange": "BSE_INDEX",
+      "category": "broad",
+      "sort_order": 25
+    },
+    {
+      "symbol": "BSE INDIA DEFENCE",
+      "name": "BSE INDIA DEFENCE",
+      "exchange": "BSE_INDEX",
+      "category": "sectoral",
+      "sort_order": 26
+    },
+    {
+      "symbol": "BSE INDIA SECT LEADER",
+      "name": "BSE INDIA SECT LEADER",
+      "exchange": "BSE_INDEX",
+      "category": "thematic",
+      "sort_order": 27
+    },
+    {
+      "symbol": "BSE INFRA",
+      "name": "BSE INFRA",
+      "exchange": "BSE_INDEX",
+      "category": "sectoral",
+      "sort_order": 28
+    },
+    {
+      "symbol": "BSE INTERNET ECONOMY",
+      "name": "BSE INTERNET ECONOMY",
+      "exchange": "BSE_INDEX",
+      "category": "sectoral",
+      "sort_order": 29
+    },
+    {
+      "symbol": "BSE IPO",
+      "name": "BSE IPO",
+      "exchange": "BSE_INDEX",
+      "category": "thematic",
+      "sort_order": 30
+    },
+    {
+      "symbol": "BSE IT",
+      "name": "BSE IT",
+      "exchange": "BSE_INDEX",
+      "category": "sectoral",
+      "sort_order": 31
+    },
+    {
+      "symbol": "BSE MCAP150MOMENTUM30",
+      "name": "BSE MCAP150MOMENTUM30",
+      "exchange": "BSE_INDEX",
+      "category": "strategy",
+      "sort_order": 32
+    },
+    {
+      "symbol": "BSE METAL",
+      "name": "BSE METAL",
+      "exchange": "BSE_INDEX",
+      "category": "sectoral",
+      "sort_order": 33
+    },
+    {
+      "symbol": "BSE MIDCAP",
+      "name": "BSE MIDCAP",
+      "exchange": "BSE_INDEX",
+      "category": "broad",
+      "sort_order": 34
+    },
+    {
+      "symbol": "BSE MIDSML PB QLT TLT",
+      "name": "BSE MIDSML PB QLT TLT",
+      "exchange": "BSE_INDEX",
+      "category": "strategy",
+      "sort_order": 35
+    },
+    {
+      "symbol": "BSE OIL&GAS",
+      "name": "BSE OIL&GAS",
+      "exchange": "BSE_INDEX",
+      "category": "sectoral",
+      "sort_order": 36
+    },
+    {
+      "symbol": "BSE POWER",
+      "name": "BSE POWER",
+      "exchange": "BSE_INDEX",
+      "category": "sectoral",
+      "sort_order": 37
+    },
+    {
+      "symbol": "BSE POWER & ENERGY",
+      "name": "BSE POWER & ENERGY",
+      "exchange": "BSE_INDEX",
+      "category": "sectoral",
+      "sort_order": 38
+    },
+    {
+      "symbol": "BSE PSU",
+      "name": "BSE PSU",
+      "exchange": "BSE_INDEX",
+      "category": "thematic",
+      "sort_order": 39
+    },
+    {
+      "symbol": "BSE PSU BANK",
+      "name": "BSE PSU BANK",
+      "exchange": "BSE_INDEX",
+      "category": "sectoral",
+      "sort_order": 40
+    },
+    {
+      "symbol": "BSE REALTY",
+      "name": "BSE REALTY",
+      "exchange": "BSE_INDEX",
+      "category": "sectoral",
+      "sort_order": 41
+    },
+    {
+      "symbol": "BSE SELECT BUSINESS GROUPS",
+      "name": "BSE SELECT BUSINESS GROUPS",
+      "exchange": "BSE_INDEX",
+      "category": "thematic",
+      "sort_order": 42
+    },
+    {
+      "symbol": "BSE SELECT IPO",
+      "name": "BSE SELECT IPO",
+      "exchange": "BSE_INDEX",
+      "category": "thematic",
+      "sort_order": 43
+    },
+    {
+      "symbol": "BSE SENSEX 50",
+      "name": "BSE SENSEX 50",
+      "exchange": "BSE_INDEX",
+      "category": "broad",
+      "sort_order": 44
+    },
+    {
+      "symbol": "BSE SENSEX EQUAL WEIGHT",
+      "name": "BSE SENSEX EQUAL WEIGHT",
+      "exchange": "BSE_INDEX",
+      "category": "strategy",
+      "sort_order": 45
+    },
+    {
+      "symbol": "BSE SENSEX SIXTY",
+      "name": "BSE SENSEX SIXTY",
+      "exchange": "BSE_INDEX",
+      "category": "broad",
+      "sort_order": 46
+    },
+    {
+      "symbol": "BSE SENSEX SIXTY 65:35",
+      "name": "BSE SENSEX SIXTY 65:35",
+      "exchange": "BSE_INDEX",
+      "category": "strategy",
+      "sort_order": 47
+    },
+    {
+      "symbol": "BSE SHA50",
+      "name": "BSE SHA50",
+      "exchange": "BSE_INDEX",
+      "category": "thematic",
+      "sort_order": 48
+    },
+    {
+      "symbol": "BSE SMEIPO",
+      "name": "BSE SMEIPO",
+      "exchange": "BSE_INDEX",
+      "category": "thematic",
+      "sort_order": 49
+    },
+    {
+      "symbol": "BSE SMLCAP",
+      "name": "BSE SMLCAP",
+      "exchange": "BSE_INDEX",
+      "category": "broad",
+      "sort_order": 50
+    },
+    {
+      "symbol": "BSE TECK",
+      "name": "BSE TECK",
+      "exchange": "BSE_INDEX",
+      "category": "sectoral",
+      "sort_order": 51
+    },
+    {
+      "symbol": "BSE TOP 10 BANKS",
+      "name": "BSE TOP 10 BANKS",
+      "exchange": "BSE_INDEX",
+      "category": "sectoral",
+      "sort_order": 52
+    },
+    {
+      "symbol": "BSE100",
+      "name": "BSE100",
+      "exchange": "BSE_INDEX",
+      "category": "broad",
+      "sort_order": 53
+    },
+    {
+      "symbol": "CDGS",
+      "name": "CDGS",
+      "exchange": "BSE_INDEX",
+      "category": "thematic",
+      "sort_order": 54
+    },
+    {
+      "symbol": "DFRGRI",
+      "name": "DFRGRI",
+      "exchange": "BSE_INDEX",
+      "category": "thematic",
+      "sort_order": 55
+    },
+    {
+      "symbol": "DHAANYA",
+      "name": "DHAANYA",
+      "exchange": "MCX_INDEX",
+      "category": "commodity",
+      "sort_order": 56
+    },
+    {
+      "symbol": "ENERGY",
+      "name": "ENERGY",
+      "exchange": "BSE_INDEX",
+      "category": "sectoral",
+      "sort_order": 57
+    },
+    {
+      "symbol": "FIN",
+      "name": "FIN",
+      "exchange": "BSE_INDEX",
+      "category": "sectoral",
+      "sort_order": 58
+    },
+    {
+      "symbol": "INDIA VIX",
+      "name": "INDIA VIX",
+      "exchange": "NSE_INDEX",
+      "category": "volatility",
+      "sort_order": 59
+    },
+    {
+      "symbol": "INDSTR",
+      "name": "INDSTR",
+      "exchange": "BSE_INDEX",
+      "category": "sectoral",
+      "sort_order": 60
+    },
+    {
+      "symbol": "LRGCAP",
+      "name": "LRGCAP",
+      "exchange": "BSE_INDEX",
+      "category": "broad",
+      "sort_order": 61
+    },
+    {
+      "symbol": "MCXCOMDEX",
+      "name": "MCXCOMDEX",
+      "exchange": "MCX_INDEX",
+      "category": "commodity",
+      "sort_order": 62
+    },
+    {
+      "symbol": "MIDSEL",
+      "name": "MIDSEL",
+      "exchange": "BSE_INDEX",
+      "category": "broad",
+      "sort_order": 63
+    },
+    {
+      "symbol": "NIFTY 100",
+      "name": "NIFTY 100",
+      "exchange": "NSE_INDEX",
+      "category": "broad",
+      "sort_order": 64
+    },
+    {
+      "symbol": "NIFTY 200",
+      "name": "NIFTY 200",
+      "exchange": "NSE_INDEX",
+      "category": "broad",
+      "sort_order": 65
+    },
+    {
+      "symbol": "NIFTY 50",
+      "name": "NIFTY 50",
+      "exchange": "NSE_INDEX",
+      "category": "broad",
+      "sort_order": 66
+    },
+    {
+      "symbol": "NIFTY 500",
+      "name": "NIFTY 500",
+      "exchange": "NSE_INDEX",
+      "category": "broad",
+      "sort_order": 67
+    },
+    {
+      "symbol": "NIFTY AUTO",
+      "name": "NIFTY AUTO",
+      "exchange": "NSE_INDEX",
+      "category": "sectoral",
+      "sort_order": 68
+    },
+    {
+      "symbol": "NIFTY BANK",
+      "name": "NIFTY BANK",
+      "exchange": "NSE_INDEX",
+      "category": "sectoral",
+      "sort_order": 69
+    },
+    {
+      "symbol": "NIFTY COMMODITIES",
+      "name": "NIFTY COMMODITIES",
+      "exchange": "NSE_INDEX",
+      "category": "sectoral",
+      "sort_order": 70
+    },
+    {
+      "symbol": "NIFTY CONSUMPTION",
+      "name": "NIFTY CONSUMPTION",
+      "exchange": "NSE_INDEX",
+      "category": "sectoral",
+      "sort_order": 71
+    },
+    {
+      "symbol": "NIFTY CPSE",
+      "name": "NIFTY CPSE",
+      "exchange": "NSE_INDEX",
+      "category": "thematic",
+      "sort_order": 72
+    },
+    {
+      "symbol": "NIFTY DIV OPPS 50",
+      "name": "NIFTY DIV OPPS 50",
+      "exchange": "NSE_INDEX",
+      "category": "strategy",
+      "sort_order": 73
+    },
+    {
+      "symbol": "NIFTY ENERGY",
+      "name": "NIFTY ENERGY",
+      "exchange": "NSE_INDEX",
+      "category": "sectoral",
+      "sort_order": 74
+    },
+    {
+      "symbol": "NIFTY FIN SERVICE",
+      "name": "NIFTY FIN SERVICE",
+      "exchange": "NSE_INDEX",
+      "category": "sectoral",
+      "sort_order": 75
+    },
+    {
+      "symbol": "NIFTY FMCG",
+      "name": "NIFTY FMCG",
+      "exchange": "NSE_INDEX",
+      "category": "sectoral",
+      "sort_order": 76
+    },
+    {
+      "symbol": "NIFTY GROWSECT 15",
+      "name": "NIFTY GROWSECT 15",
+      "exchange": "NSE_INDEX",
+      "category": "strategy",
+      "sort_order": 77
+    },
+    {
+      "symbol": "NIFTY INFRA",
+      "name": "NIFTY INFRA",
+      "exchange": "NSE_INDEX",
+      "category": "sectoral",
+      "sort_order": 78
+    },
+    {
+      "symbol": "NIFTY IT",
+      "name": "NIFTY IT",
+      "exchange": "NSE_INDEX",
+      "category": "sectoral",
+      "sort_order": 79
+    },
+    {
+      "symbol": "NIFTY MEDIA",
+      "name": "NIFTY MEDIA",
+      "exchange": "NSE_INDEX",
+      "category": "sectoral",
+      "sort_order": 80
+    },
+    {
+      "symbol": "NIFTY METAL",
+      "name": "NIFTY METAL",
+      "exchange": "NSE_INDEX",
+      "category": "sectoral",
+      "sort_order": 81
+    },
+    {
+      "symbol": "NIFTY MID SELECT",
+      "name": "NIFTY MID SELECT",
+      "exchange": "NSE_INDEX",
+      "category": "broad",
+      "sort_order": 82
+    },
+    {
+      "symbol": "NIFTY MIDCAP 100",
+      "name": "NIFTY MIDCAP 100",
+      "exchange": "NSE_INDEX",
+      "category": "broad",
+      "sort_order": 83
+    },
+    {
+      "symbol": "NIFTY MIDCAP 50",
+      "name": "NIFTY MIDCAP 50",
+      "exchange": "NSE_INDEX",
+      "category": "broad",
+      "sort_order": 84
+    },
+    {
+      "symbol": "NIFTY MIDSML HLTH",
+      "name": "NIFTY MIDSML HLTH",
+      "exchange": "NSE_INDEX",
+      "category": "sectoral",
+      "sort_order": 85
+    },
+    {
+      "symbol": "NIFTY MNC",
+      "name": "NIFTY MNC",
+      "exchange": "NSE_INDEX",
+      "category": "thematic",
+      "sort_order": 86
+    },
+    {
+      "symbol": "NIFTY MULTI INFRA",
+      "name": "NIFTY MULTI INFRA",
+      "exchange": "NSE_INDEX",
+      "category": "thematic",
+      "sort_order": 87
+    },
+    {
+      "symbol": "NIFTY MULTI MFG",
+      "name": "NIFTY MULTI MFG",
+      "exchange": "NSE_INDEX",
+      "category": "thematic",
+      "sort_order": 88
+    },
+    {
+      "symbol": "NIFTY NEXT 50",
+      "name": "NIFTY NEXT 50",
+      "exchange": "NSE_INDEX",
+      "category": "broad",
+      "sort_order": 89
+    },
+    {
+      "symbol": "NIFTY PHARMA",
+      "name": "NIFTY PHARMA",
+      "exchange": "NSE_INDEX",
+      "category": "sectoral",
+      "sort_order": 90
+    },
+    {
+      "symbol": "NIFTY PSE",
+      "name": "NIFTY PSE",
+      "exchange": "NSE_INDEX",
+      "category": "thematic",
+      "sort_order": 91
+    },
+    {
+      "symbol": "NIFTY PSU BANK",
+      "name": "NIFTY PSU BANK",
+      "exchange": "NSE_INDEX",
+      "category": "sectoral",
+      "sort_order": 92
+    },
+    {
+      "symbol": "NIFTY REALTY",
+      "name": "NIFTY REALTY",
+      "exchange": "NSE_INDEX",
+      "category": "sectoral",
+      "sort_order": 93
+    },
+    {
+      "symbol": "NIFTY SERV SECTOR",
+      "name": "NIFTY SERV SECTOR",
+      "exchange": "NSE_INDEX",
+      "category": "sectoral",
+      "sort_order": 94
+    },
+    {
+      "symbol": "NIFTY SMLCAP 100",
+      "name": "NIFTY SMLCAP 100",
+      "exchange": "NSE_INDEX",
+      "category": "broad",
+      "sort_order": 95
+    },
+    {
+      "symbol": "NIFTY TATA 25 CAP",
+      "name": "NIFTY TATA 25 CAP",
+      "exchange": "NSE_INDEX",
+      "category": "thematic",
+      "sort_order": 96
+    },
+    {
+      "symbol": "NIFTY100 LIQ 15",
+      "name": "NIFTY100 LIQ 15",
+      "exchange": "NSE_INDEX",
+      "category": "strategy",
+      "sort_order": 97
+    },
+    {
+      "symbol": "SENSEX",
+      "name": "SENSEX",
+      "exchange": "BSE_INDEX",
+      "category": "broad",
+      "sort_order": 98
+    },
+    {
+      "symbol": "SMLSEL",
+      "name": "SMLSEL",
+      "exchange": "BSE_INDEX",
+      "category": "broad",
+      "sort_order": 99
+    },
+    {
+      "symbol": "SNXT50",
+      "name": "SNXT50",
+      "exchange": "BSE_INDEX",
+      "category": "broad",
+      "sort_order": 100
+    },
+    {
+      "symbol": "TELCOM",
+      "name": "TELCOM",
+      "exchange": "BSE_INDEX",
+      "category": "sectoral",
+      "sort_order": 101
+    },
+    {
+      "symbol": "UTILS",
+      "name": "UTILS",
+      "exchange": "BSE_INDEX",
+      "category": "sectoral",
+      "sort_order": 102
+    }
+  ],
+  "home_indices": [
+    {
+      "name": "SENSEX",
+      "symbol": "SENSEX",
+      "exchange": "BSE_INDEX"
+    },
+    {
+      "name": "NIFTY 50",
+      "symbol": "NIFTY 50",
+      "exchange": "NSE_INDEX"
+    },
+    {
+      "name": "NIFTY BANK",
+      "symbol": "NIFTY BANK",
+      "exchange": "NSE_INDEX"
+    },
+    {
+      "name": "NIFTY MID SELECT",
+      "symbol": "NIFTY MID SELECT",
+      "exchange": "NSE_INDEX"
+    },
+    {
+      "name": "CRUDEOIL",
+      "symbol": "CRUDEOIL",
+      "exchange": "MCX"
+    },
+    {
+      "name": "NATURALGAS",
+      "symbol": "NATURALGAS",
+      "exchange": "MCX"
+    },
+    {
+      "name": "INDIA VIX",
+      "symbol": "INDIA VIX",
+      "exchange": "NSE_INDEX"
+    },
+    {
+      "name": "GOLD",
+      "symbol": "GOLD",
+      "exchange": "MCX"
+    },
+    {
+      "name": "SILVER",
+      "symbol": "SILVER",
+      "exchange": "MCX"
+    }
+  ],
+  "macro_indicators": [
+    {
+      "key": "gdp_growth",
+      "title": "GDP Growth Rate",
+      "category": "macro",
+      "unit": "% YoY",
+      "frequency": "quarterly",
+      "source": "Ministry of Statistics and Programme Implementation (MoSPI)",
+      "source_url": "https://www.mospi.gov.in"
+    },
+    {
+      "key": "cpi_inflation",
+      "title": "CPI Inflation",
+      "category": "macro",
+      "unit": "% YoY",
+      "frequency": "monthly",
+      "source": "Ministry of Statistics and Programme Implementation (MoSPI)",
+      "source_url": "https://www.mospi.gov.in"
+    },
+    {
+      "key": "wpi_inflation",
+      "title": "WPI Inflation",
+      "category": "macro",
+      "unit": "% YoY",
+      "frequency": "monthly",
+      "source": "Office of the Economic Adviser, DPIIT",
+      "source_url": "https://eaindustry.nic.in"
+    },
+    {
+      "key": "repo_rate",
+      "title": "RBI Repo Rate",
+      "category": "macro",
+      "unit": "%",
+      "frequency": "event-driven",
+      "source": "Reserve Bank of India (RBI)",
+      "source_url": "https://www.rbi.org.in"
+    },
+    {
+      "key": "reverse_repo_rate",
+      "title": "RBI Reverse Repo Rate",
+      "category": "macro",
+      "unit": "%",
+      "frequency": "event-driven",
+      "source": "Reserve Bank of India (RBI)",
+      "source_url": "https://www.rbi.org.in"
+    },
+    {
+      "key": "crr",
+      "title": "Cash Reserve Ratio (CRR)",
+      "category": "macro",
+      "unit": "%",
+      "frequency": "event-driven",
+      "source": "Reserve Bank of India (RBI)",
+      "source_url": "https://www.rbi.org.in"
+    },
+    {
+      "key": "slr",
+      "title": "Statutory Liquidity Ratio (SLR)",
+      "category": "macro",
+      "unit": "%",
+      "frequency": "event-driven",
+      "source": "Reserve Bank of India (RBI)",
+      "source_url": "https://www.rbi.org.in"
+    },
+    {
+      "key": "fiscal_deficit",
+      "title": "Fiscal Deficit",
+      "category": "macro",
+      "unit": "% of GDP",
+      "frequency": "monthly",
+      "source": "Controller General of Accounts (CGA)",
+      "source_url": "https://www.cga.nic.in"
+    },
+    {
+      "key": "iip",
+      "title": "Index of Industrial Production (IIP)",
+      "category": "macro",
+      "unit": "% YoY",
+      "frequency": "monthly",
+      "source": "Ministry of Statistics and Programme Implementation (MoSPI)",
+      "source_url": "https://www.mospi.gov.in"
+    },
+    {
+      "key": "trade_balance",
+      "title": "Trade Balance",
+      "category": "macro",
+      "unit": "USD bn",
+      "frequency": "monthly",
+      "source": "Ministry of Commerce and Industry",
+      "source_url": "https://www.commerce.gov.in"
+    },
+    {
+      "key": "current_account",
+      "title": "Current Account Balance",
+      "category": "macro",
+      "unit": "% of GDP",
+      "frequency": "quarterly",
+      "source": "Reserve Bank of India (RBI)",
+      "source_url": "https://www.rbi.org.in"
+    },
+    {
+      "key": "forex_reserves",
+      "title": "Forex Reserves",
+      "category": "macro",
+      "unit": "USD bn",
+      "frequency": "weekly",
+      "source": "Reserve Bank of India (RBI)",
+      "source_url": "https://www.rbi.org.in"
+    },
+    {
+      "key": "pmi_manufacturing",
+      "title": "Manufacturing PMI",
+      "category": "macro",
+      "unit": "index",
+      "frequency": "monthly",
+      "source": "S&P Global",
+      "source_url": "https://www.pmi.spglobal.com"
+    },
+    {
+      "key": "pmi_services",
+      "title": "Services PMI",
+      "category": "macro",
+      "unit": "index",
+      "frequency": "monthly",
+      "source": "S&P Global",
+      "source_url": "https://www.pmi.spglobal.com"
+    },
+    {
+      "key": "unemployment_rate",
+      "title": "Unemployment Rate",
+      "category": "macro",
+      "unit": "%",
+      "frequency": "monthly",
+      "source": "Periodic Labour Force Survey (PLFS) / MoSPI",
+      "source_url": "https://www.mospi.gov.in"
+    },
+    {
+      "key": "core_sector_output",
+      "title": "Core Sector Output",
+      "category": "macro",
+      "unit": "% YoY",
+      "frequency": "monthly",
+      "source": "Office of the Economic Adviser, DPIIT",
+      "source_url": "https://eaindustry.nic.in"
+    },
+    {
+      "key": "auto_sales",
+      "title": "Auto Sales",
+      "category": "micro",
+      "unit": "units",
+      "frequency": "monthly",
+      "source": "Society of Indian Automobile Manufacturers (SIAM)",
+      "source_url": "https://www.siam.in"
+    },
+    {
+      "key": "gst_collections",
+      "title": "GST Collections",
+      "category": "macro",
+      "unit": "INR crore",
+      "frequency": "monthly",
+      "source": "GST Council / Ministry of Finance",
+      "source_url": "https://www.gst.gov.in"
+    },
+    {
+      "key": "credit_growth",
+      "title": "Bank Credit Growth",
+      "category": "macro",
+      "unit": "% YoY",
+      "frequency": "fortnightly",
+      "source": "Reserve Bank of India (RBI)",
+      "source_url": "https://www.rbi.org.in"
+    },
+    {
+      "key": "bank_deposit_growth",
+      "title": "Bank Deposit Growth",
+      "category": "macro",
+      "unit": "% YoY",
+      "frequency": "fortnightly",
+      "source": "Reserve Bank of India (RBI)",
+      "source_url": "https://www.rbi.org.in"
+    },
+    {
+      "key": "house_price_index",
+      "title": "House Price Index (HPI)",
+      "category": "macro",
+      "unit": "index",
+      "frequency": "quarterly",
+      "source": "National Housing Bank (NHB)",
+      "source_url": "https://nhb.org.in"
+    },
+    {
+      "key": "consumer_durables_fmcg",
+      "title": "Consumer Durables & FMCG",
+      "category": "micro",
+      "unit": "% YoY",
+      "frequency": "monthly",
+      "source": "Ministry of Statistics and Programme Implementation (MoSPI)",
+      "source_url": "https://www.mospi.gov.in"
+    },
+    {
+      "key": "fdi_inflows",
+      "title": "FDI Inflows",
+      "category": "macro",
+      "unit": "USD bn",
+      "frequency": "quarterly",
+      "source": "Department for Promotion of Industry and Internal Trade (DPIIT)",
+      "source_url": "https://dpiit.gov.in"
+    }
+  ],
+  "benchmarks": [
+    {
+      "key": "rbi_gsec",
+      "title": "RBI Government Bonds (G-Sec)",
+      "unit": "%",
+      "series": [
+        {
+          "key": "in_gsec_10y",
+          "name": "India 10Y G-Sec Yield"
+        },
+        {
+          "key": "in_gsec_5y",
+          "name": "India 5Y G-Sec Yield"
+        },
+        {
+          "key": "in_gsec_91d",
+          "name": "India 91-Day T-Bill Yield"
+        }
+      ]
+    },
+    {
+      "key": "us_treasury_10y",
+      "title": "US Treasury Yields 10Y",
+      "unit": "%",
+      "series": [
+        {
+          "key": "us_10y",
+          "name": "US 10Y Treasury Yield"
+        }
+      ]
+    },
+    {
+      "key": "sgb",
+      "title": "Sovereign Gold Bonds",
+      "unit": "INR/gram",
+      "series": [
+        {
+          "key": "sgb_price",
+          "name": "Sovereign Gold Bond Price"
+        }
+      ]
+    },
+    {
+      "key": "repo_rates",
+      "title": "Policy Rates: RBI vs US Fed",
+      "unit": "%",
+      "series": [
+        {
+          "key": "rbi_repo",
+          "name": "RBI Repo Rate"
+        },
+        {
+          "key": "us_fed_funds",
+          "name": "US Fed Funds Rate"
+        }
+      ]
+    }
+  ]
+}

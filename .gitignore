@@ -15,3 +15,10 @@ Thumbs.db
 # Local env
 .env
 .env.local
+
+# Bazzar data layer (DuckDB database + chart cache)
+data/
+
+# Python
+__pycache__/
+*.pyc
