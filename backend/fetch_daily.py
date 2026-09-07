@@ -19,7 +19,9 @@ import datetime as dt
 import sys
 
 from .db import get_connection, initialize_database, load_config
+from .ingestion import ingestion_run
 from .openalgo_client import CredentialsNotConfigured, OpenAlgoClient, normalize_history
+from .validation import upsert_daily_ohlcv
 
 JOB = "daily_equity"
 
@@ -43,18 +45,9 @@ def set_checkpoint(con, job: str, symbol: str) -> None:
 
 
 def upsert_bars(con, symbol: str, exchange: str, bars: list[dict]) -> int:
-    con.executemany(
-        "INSERT INTO daily_ohlcv (symbol, exchange, date, open, high, low, close, volume)"
-        " VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
-        " ON CONFLICT (symbol, exchange, date) DO UPDATE SET open = excluded.open,"
-        " high = excluded.high, low = excluded.low, close = excluded.close,"
-        " volume = excluded.volume",
-        [
-            (symbol, exchange, b["date"], b["open"], b["high"], b["low"], b["close"], b["volume"])
-            for b in bars
-        ],
-    )
-    return len(bars)
+    """Legacy shim — delegates to the validated write path (P2)."""
+    written, _ = upsert_daily_ohlcv(con, job=JOB, symbol=symbol, exchange=exchange, bars=bars)
+    return written
 
 
 def pending_symbols(con, job: str) -> list[tuple[str, str]]:
@@ -87,19 +80,29 @@ def run(start: str, end: str) -> int:
         f"Fetching daily OHLCV for {len(todo)} securities ({start} -> {end}),"
         f" strict alphabetical order, interval 'D'."
     )
+    con = get_connection()
     total = 0
-    for symbol, exchange in todo:
-        con = get_connection()
-        try:
-            payload = client.history(symbol, exchange, start, end)
-            bars = normalize_history(payload)
-            n = upsert_bars(con, symbol, exchange, bars)
-            set_checkpoint(con, JOB, symbol)
-            total += n
-            print(f"  {symbol} ({exchange}): {n} daily bars")
-        finally:
-            con.close()
-    print(f"Done. {total} bars upserted across {len(todo)} symbols.")
+    total_rejected = 0
+    try:
+        with ingestion_run(con, JOB) as run:
+            for symbol, exchange in todo:
+                payload = client.history(symbol, exchange, start, end)
+                bars = normalize_history(payload)
+                written, rejected = upsert_daily_ohlcv(
+                    con, job=JOB, symbol=symbol, exchange=exchange, bars=bars
+                )
+                set_checkpoint(con, JOB, symbol)
+                run.rows_written += written
+                run.rows_rejected += rejected
+                total += written
+                total_rejected += rejected
+                print(f"  {symbol} ({exchange}): {written} daily bars, {rejected} rejected")
+    finally:
+        con.close()
+    print(
+        f"Done. {total} bars upserted across {len(todo)} symbols"
+        f" ({total_rejected} rows quarantined in data_rejects)."
+    )
     return 0
 
 

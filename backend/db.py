@@ -111,22 +111,34 @@ def _seed_benchmark_series(con: duckdb.DuckDBPyConnection, config: dict[str, Any
 
 
 def initialize_database(config_path: str | None = None) -> dict[str, int]:
-    """Create every table defined in db_config.json and seed the config-derived
-    reference tables (index_master, macro_series, benchmark_series).
+    """Migrate to the latest schema, then seed config-derived reference data.
 
-    Idempotent: tables use CREATE TABLE IF NOT EXISTS and the seed tables are
-    fully rebuilt from the config on every run.
+    Flow (P2):
+      1. ``migrate_to_latest`` applies pending SQL migrations (baseline +
+         ops tables: data_rejects, ingestion_runs, trading_calendar).
+      2. Config safety net: CREATE TABLE IF NOT EXISTS for any table present
+         in db_config.json but not yet covered by a migration.
+      3. Seeds: index_master, macro_series, benchmark_series are rebuilt from
+         db_config.json; trading_calendar is upserted from the NSE seed CSV.
+
+    Idempotent: safe to run on every startup.
     """
+    from .calendar import seed_trading_calendar  # local import: avoid cycle
+    from .migrate import migrate_to_latest  # local import: migrate imports db
+
     config = load_config(config_path)
     con = get_connection()
     try:
+        applied = migrate_to_latest(con)
         for name, spec in config["tables"].items():
             con.execute(_create_table_sql(name, spec))
         summary = {
             "tables": len(config["tables"]),
+            "migrations_applied": len(applied),
             "index_master": _seed_index_master(con, config),
             "macro_series": _seed_macro_series(con, config),
             "benchmark_series": _seed_benchmark_series(con, config),
+            "trading_calendar": seed_trading_calendar(con),
         }
     finally:
         con.close()
@@ -138,9 +150,11 @@ def main() -> None:
     db_path = get_db_path()
     print(f"Initialized Bazzar database at {db_path}")
     print(f"  tables created : {summary['tables']}")
+    print(f"  migrations applied: {summary['migrations_applied']}")
     print(f"  index_master   : {summary['index_master']} indices seeded")
     print(f"  macro_series   : {summary['macro_series']} indicators seeded")
     print(f"  benchmark_series: {summary['benchmark_series']} series seeded")
+    print(f"  trading_calendar: {summary['trading_calendar']} calendar days seeded")
 
 
 if __name__ == "__main__":

@@ -22,7 +22,9 @@ import sys
 
 from .db import get_connection, initialize_database
 from .fetch_daily import default_start, get_checkpoint, set_checkpoint
+from .ingestion import ingestion_run
 from .openalgo_client import CredentialsNotConfigured, OpenAlgoClient, normalize_history
+from .validation import upsert_index_daily
 
 JOB = "daily_indices"
 
@@ -73,14 +75,9 @@ def pending_indices(con, job: str) -> list[tuple[str, str]]:
 
 
 def upsert_index_bars(con, symbol: str, bars: list[dict]) -> int:
-    con.executemany(
-        "INSERT INTO index_daily (symbol, date, open, high, low, close)"
-        " VALUES (?, ?, ?, ?, ?, ?)"
-        " ON CONFLICT (symbol, date) DO UPDATE SET open = excluded.open,"
-        " high = excluded.high, low = excluded.low, close = excluded.close",
-        [(symbol, b["date"], b["open"], b["high"], b["low"], b["close"]) for b in bars],
-    )
-    return len(bars)
+    """Legacy shim — delegates to the validated write path (P2)."""
+    written, _ = upsert_index_daily(con, job=JOB, symbol=symbol, exchange="IDX", bars=bars)
+    return written
 
 
 def run(start: str, end: str) -> int:
@@ -100,24 +97,30 @@ def run(start: str, end: str) -> int:
         f"Fetching daily OHLC for {len(todo)} indices ({start} -> {end}),"
         f" alphabetical via sort_order, interval 'D'."
     )
-    total = 0
-    for symbol, exchange in todo:
-        con = get_connection()
-        try:
-            payload = client.history(symbol, exchange, start, end)
-            bars = normalize_history(payload)
-            n = upsert_index_bars(con, symbol, bars)
-            set_checkpoint(con, JOB, symbol)
-            total += n
-            print(f"  {symbol} ({exchange}): {n} daily bars")
-        finally:
-            con.close()
     con = get_connection()
+    total = 0
+    total_rejected = 0
     try:
+        with ingestion_run(con, JOB) as run:
+            for symbol, exchange in todo:
+                payload = client.history(symbol, exchange, start, end)
+                bars = normalize_history(payload)
+                written, rejected = upsert_index_daily(
+                    con, job=JOB, symbol=symbol, exchange=exchange, bars=bars
+                )
+                set_checkpoint(con, JOB, symbol)
+                run.rows_written += written
+                run.rows_rejected += rejected
+                total += written
+                total_rejected += rejected
+                print(f"  {symbol} ({exchange}): {written} daily bars, {rejected} rejected")
         ensure_snapshot_view(con)
     finally:
         con.close()
-    print(f"Done. {total} bars upserted across {len(todo)} indices; index_snapshot view refreshed.")
+    print(
+        f"Done. {total} bars upserted across {len(todo)} indices"
+        f" ({total_rejected} rows quarantined); index_snapshot view refreshed."
+    )
     return 0
 
 
