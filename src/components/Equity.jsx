@@ -5,7 +5,16 @@ import SearchInput from './SearchInput.jsx';
 const MAX_WATCHLIST_STOCKS = 50;
 
 export default function Equity() {
-  const tabs = ['Watchlist', 'NSE', 'BSE', 'Recommendations', 'Results', 'Top Gainers', 'Top Losers', 'Volume Shockers'];
+  const tabs = [
+    'Watchlist',
+    'NSE',
+    'BSE',
+    'Recommendations',
+    'Results',
+    'Top Gainers',
+    'Top Losers',
+    'Volume Shockers',
+  ];
   const [activeTab, setActiveTab] = useState('Watchlist');
   const [activeWatchlist, setActiveWatchlist] = useState('Watchlist 1');
   // Local state: watchlist name -> array of { symbol, name, exchange }.
@@ -36,7 +45,11 @@ export default function Equity() {
       {/* Sub-navigation */}
       <div className="flex gap-4 border-b border-gray-700 pb-2 mb-6 overflow-x-auto">
         {tabs.map((tab) => (
-          <button key={tab} onClick={() => setActiveTab(tab)} className={`pb-2 ${activeTab === tab ? 'border-b-2 border-red-500 text-red-500' : 'text-gray-400'}`}>
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={`pb-2 ${activeTab === tab ? 'border-b-2 border-red-500 text-red-500' : 'text-gray-400'}`}
+          >
             {tab}
           </button>
         ))}
@@ -50,7 +63,11 @@ export default function Equity() {
               value={activeWatchlist}
               onChange={(e) => setActiveWatchlist(e.target.value)}
             >
-              {watchlists.map((w) => <option key={w} value={w}>{w}</option>)}
+              {watchlists.map((w) => (
+                <option key={w} value={w}>
+                  {w}
+                </option>
+              ))}
             </select>
             <span className="text-gray-400 text-sm">
               {currentStocks.length} / {MAX_WATCHLIST_STOCKS} stocks
@@ -62,11 +79,16 @@ export default function Equity() {
             onSelect={handleAddStock}
           />
           {currentStocks.length === 0 ? (
-            <p className="text-gray-500">No stocks yet. Search above to add stocks to this watchlist.</p>
+            <p className="text-gray-500">
+              No stocks yet. Search above to add stocks to this watchlist.
+            </p>
           ) : (
             <ul className="space-y-2">
               {currentStocks.map((stock) => (
-                <li key={stock.symbol} className="flex items-center justify-between bg-gray-800 p-2 rounded text-sm">
+                <li
+                  key={stock.symbol}
+                  className="flex items-center justify-between bg-gray-800 p-2 rounded text-sm"
+                >
                   <span className="font-bold text-yellow-500">{stock.symbol}</span>
                   <span className="flex-1 text-gray-300 truncate px-3">{stock.name}</span>
                   <span className="text-xs text-gray-500 mr-3">{stock.exchange}</span>
@@ -87,11 +109,15 @@ export default function Equity() {
       {['Top Gainers', 'Top Losers', 'Volume Shockers'].includes(activeTab) && (
         <div className="grid grid-cols-2 gap-8">
           <div className={theme.card}>
-            <h4 className="text-white border-b border-gray-700 pb-2 mb-2 font-bold">NSE Breakdown</h4>
+            <h4 className="text-white border-b border-gray-700 pb-2 mb-2 font-bold">
+              NSE Breakdown
+            </h4>
             {/* Data injected from Python Backend */}
           </div>
           <div className={theme.card}>
-            <h4 className="text-white border-b border-gray-700 pb-2 mb-2 font-bold">BSE Breakdown</h4>
+            <h4 className="text-white border-b border-gray-700 pb-2 mb-2 font-bold">
+              BSE Breakdown
+            </h4>
             {/* Data injected from Python Backend */}
           </div>
         </div>
@@ -99,7 +125,7 @@ export default function Equity() {
 
       {activeTab === 'Results' && (
         <div className={theme.card}>
-          <h4 className={theme.goldText}>Today's Quarterly Results</h4>
+          <h4 className={theme.goldText}>Today&apos;s Quarterly Results</h4>
           {/* Table showing specific day result stocks */}
         </div>
       )}

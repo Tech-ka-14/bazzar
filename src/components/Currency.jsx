@@ -24,8 +24,16 @@ export default function Currency() {
       <section className={theme.card}>
         <div className="flex justify-between items-center mb-4">
           <h3 className={`text-xl ${theme.goldText}`}>Live Currency Rates</h3>
-          <input type="search" placeholder="Search currency..." className="bg-gray-800 p-1 rounded text-white border border-gray-600" list="currencies" />
-          <datalist id="currencies"><option value="GBPUSD" /><option value="AUDUSD" /></datalist>
+          <input
+            type="search"
+            placeholder="Search currency..."
+            className="bg-gray-800 p-1 rounded text-white border border-gray-600"
+            list="currencies"
+          />
+          <datalist id="currencies">
+            <option value="GBPUSD" />
+            <option value="AUDUSD" />
+          </datalist>
         </div>
         <div className="space-y-4">
           {MAIN_RATES.map((rate) => {
@@ -38,10 +46,13 @@ export default function Currency() {
                 <span className="font-bold">{rate}</span>
                 {hasData ? (
                   <span className="flex items-center gap-3">
-                    <span className="text-white">{quote.value.toLocaleString('en-IN', { maximumFractionDigits: 4 })}</span>
+                    <span className="text-white">
+                      {quote.value.toLocaleString('en-IN', { maximumFractionDigits: 4 })}
+                    </span>
                     {pct !== null && (
                       <span className={up ? theme.profit : theme.loss}>
-                        {up ? '▲' : '▼'} {pct > 0 ? '+' : ''}{pct.toFixed(2)}%
+                        {up ? '▲' : '▼'} {pct > 0 ? '+' : ''}
+                        {pct.toFixed(2)}%
                       </span>
                     )}
                   </span>
@@ -57,11 +68,21 @@ export default function Currency() {
       <section className={theme.card}>
         <h3 className={`text-xl mb-4 ${theme.goldText}`}>Online Converter</h3>
         <div className="flex flex-col gap-4">
-          <input type="number" placeholder="Amount" className="p-2 bg-gray-800 rounded border border-gray-700" />
+          <input
+            type="number"
+            placeholder="Amount"
+            className="p-2 bg-gray-800 rounded border border-gray-700"
+          />
           <div className="flex gap-4">
-            <select className="p-2 bg-gray-800 rounded w-1/2 text-white"><option>USD</option><option>INR</option></select>
+            <select className="p-2 bg-gray-800 rounded w-1/2 text-white">
+              <option>USD</option>
+              <option>INR</option>
+            </select>
             <span className="text-white pt-2">to</span>
-            <select className="p-2 bg-gray-800 rounded w-1/2 text-white"><option>INR</option><option>EUR</option></select>
+            <select className="p-2 bg-gray-800 rounded w-1/2 text-white">
+              <option>INR</option>
+              <option>EUR</option>
+            </select>
           </div>
           <button className={`p-2 rounded mt-2 ${theme.goldBg} font-bold`}>CONVERT</button>
         </div>

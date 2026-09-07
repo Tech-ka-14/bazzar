@@ -4,23 +4,33 @@ import { apiGet } from '../api.js';
 
 // Display name -> tradable symbol used by the data platform.
 const SYMBOL_MAP = {
-  'Gold': 'GOLD',
-  'Silver': 'SILVER',
+  Gold: 'GOLD',
+  Silver: 'SILVER',
   'Crude Oil': 'CRUDEOIL',
   'Natural Gas': 'NATURALGAS',
-  'Copper': 'COPPER',
-  'Aluminium': 'ALUMINIUM',
-  'Zinc': 'ZINC',
-  'Lead': 'LEAD',
-  'Nickel': 'NICKEL',
+  Copper: 'COPPER',
+  Aluminium: 'ALUMINIUM',
+  Zinc: 'ZINC',
+  Lead: 'LEAD',
+  Nickel: 'NICKEL',
 };
 
 const CATEGORIES = {
-  'Bullion': ['Gold', 'Silver', 'Platinum', 'Palladium'],
+  Bullion: ['Gold', 'Silver', 'Platinum', 'Palladium'],
   'Base Metals': ['Copper', 'Aluminium', 'Zinc', 'Lead', 'Nickel', 'Brass'],
   'Ferrous Metals': ['Steel Rebar'],
-  'Energy': ['Crude Oil', 'Natural Gas'],
-  'Agricultural (Agri)': ['Cotton', 'Kapas', 'Cotton Seed Wash Oil', 'CPO', 'RBD Palmolein', 'Mentha Oil', 'Castor Seed', 'Cardamom', 'Black Pepper'],
+  Energy: ['Crude Oil', 'Natural Gas'],
+  'Agricultural (Agri)': [
+    'Cotton',
+    'Kapas',
+    'Cotton Seed Wash Oil',
+    'CPO',
+    'RBD Palmolein',
+    'Mentha Oil',
+    'Castor Seed',
+    'Cardamom',
+    'Black Pepper',
+  ],
 };
 
 export default function Commodities() {
@@ -49,10 +59,13 @@ export default function Commodities() {
     const up = (pct ?? 0) >= 0;
     return (
       <span className="flex items-center gap-2">
-        <span className="text-white">{quote.value.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span>
+        <span className="text-white">
+          {quote.value.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+        </span>
         {pct !== null && (
           <span className={up ? theme.profit : theme.loss}>
-            {up ? '▲' : '▼'} {pct > 0 ? '+' : ''}{pct.toFixed(2)}%
+            {up ? '▲' : '▼'} {pct > 0 ? '+' : ''}
+            {pct.toFixed(2)}%
           </span>
         )}
       </span>
@@ -63,7 +76,9 @@ export default function Commodities() {
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {Object.entries(CATEGORIES).map(([category, items]) => (
         <div key={category} className={theme.card}>
-          <h3 className={`text-lg font-bold mb-3 border-b border-gray-700 pb-2 ${theme.goldText}`}>{category}</h3>
+          <h3 className={`text-lg font-bold mb-3 border-b border-gray-700 pb-2 ${theme.goldText}`}>
+            {category}
+          </h3>
           <ul className="space-y-2">
             {items.map((item) => (
               <li key={item} className="flex justify-between text-sm">

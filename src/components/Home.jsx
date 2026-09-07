@@ -67,13 +67,33 @@ export default function Home() {
             placeholder="Stock"
             onSelect={(item) => setNewStock({ ...newStock, symbol: item.symbol })}
           />
-          <input type="date" className="bg-gray-800 p-2 rounded w-1/4" value={newStock.date} onChange={(e) => setNewStock({ ...newStock, date: e.target.value })} />
-          <input type="number" placeholder="Entry Price" className="bg-gray-800 p-2 rounded w-1/4" value={newStock.price} onChange={(e) => setNewStock({ ...newStock, price: e.target.value })} />
-          <button onClick={handleAddStock} className={`px-4 rounded ${theme.goldBg}`}>Add</button>
+          <input
+            type="date"
+            className="bg-gray-800 p-2 rounded w-1/4"
+            value={newStock.date}
+            onChange={(e) => setNewStock({ ...newStock, date: e.target.value })}
+          />
+          <input
+            type="number"
+            placeholder="Entry Price"
+            className="bg-gray-800 p-2 rounded w-1/4"
+            value={newStock.price}
+            onChange={(e) => setNewStock({ ...newStock, price: e.target.value })}
+          />
+          <button onClick={handleAddStock} className={`px-4 rounded ${theme.goldBg}`}>
+            Add
+          </button>
         </div>
 
         <table className="w-full text-left">
-          <thead><tr className="border-b border-gray-700 text-gray-400"><th>Stock</th><th>Entry</th><th>Live</th><th>P&L</th></tr></thead>
+          <thead>
+            <tr className="border-b border-gray-700 text-gray-400">
+              <th>Stock</th>
+              <th>Entry</th>
+              <th>Live</th>
+              <th>P&L</th>
+            </tr>
+          </thead>
           <tbody>
             {portfolio.map((item, i) => {
               const quote = quotes[item.symbol];
@@ -85,14 +105,22 @@ export default function Home() {
                   <td className="py-2">{item.symbol}</td>
                   <td>{item.price}</td>
                   <td>{live === null ? '—' : live.toFixed(2)}</td>
-                  <td className={diff === null ? 'text-gray-500' : diff >= 0 ? theme.profit : theme.loss}>
+                  <td
+                    className={
+                      diff === null ? 'text-gray-500' : diff >= 0 ? theme.profit : theme.loss
+                    }
+                  >
                     {diff === null ? '—' : `${diff > 0 ? '+' : ''}${diff.toFixed(2)}`}
                   </td>
                 </tr>
               );
             })}
             {portfolio.length === 0 && (
-              <tr><td colSpan="4" className="py-4 text-center text-gray-500">No holdings yet. Search for a stock above to add one.</td></tr>
+              <tr>
+                <td colSpan="4" className="py-4 text-center text-gray-500">
+                  No holdings yet. Search for a stock above to add one.
+                </td>
+              </tr>
             )}
           </tbody>
         </table>
@@ -101,12 +129,17 @@ export default function Home() {
       {/* Indices Section */}
       <section className={theme.card}>
         <h3 className={`text-xl mb-4 ${theme.goldText}`}>Market Indices</h3>
-        {indicesError && <p className="text-gray-500 text-sm mb-4">Live index feed unavailable — awaiting data sync.</p>}
+        {indicesError && (
+          <p className="text-gray-500 text-sm mb-4">
+            Live index feed unavailable — awaiting data sync.
+          </p>
+        )}
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           {indices.map((index) => {
             const hasData = index && typeof index.value === 'number';
             const change = hasData && typeof index.change === 'number' ? index.change : null;
-            const changePct = hasData && typeof index.changePct === 'number' ? index.changePct : null;
+            const changePct =
+              hasData && typeof index.changePct === 'number' ? index.changePct : null;
             const up = (change ?? 0) >= 0;
             return (
               <div
@@ -116,10 +149,16 @@ export default function Home() {
                 <span className="font-semibold text-white">{index.name}</span>
                 {hasData ? (
                   <>
-                    <span className="text-lg text-white">{index.value.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span>
+                    <span className="text-lg text-white">
+                      {index.value.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                    </span>
                     <span className={up ? theme.profit : theme.loss}>
-                      {up ? '▲' : '▼'} {change === null ? '—' : `${change > 0 ? '+' : ''}${change.toFixed(2)}`}
-                      {' '}({changePct === null ? '—' : `${changePct > 0 ? '+' : ''}${changePct.toFixed(2)}%`})
+                      {up ? '▲' : '▼'}{' '}
+                      {change === null ? '—' : `${change > 0 ? '+' : ''}${change.toFixed(2)}`} (
+                      {changePct === null
+                        ? '—'
+                        : `${changePct > 0 ? '+' : ''}${changePct.toFixed(2)}%`}
+                      )
                     </span>
                   </>
                 ) : (
