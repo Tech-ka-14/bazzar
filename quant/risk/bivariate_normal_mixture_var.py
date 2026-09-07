@@ -28,7 +28,7 @@ def calculate_bivariate_mixture_var(
     Follows Equations IV.2.75 through IV.2.77.
     """
     # 1. Define the Mixing Law (Probabilities of the 4 combined regimes)
-    weights = np.array([pi_1 * pi_2, (1 - pi_1) * pi_2, pi_1 * (1 - pi_2), pi_1 * (1 - pi_2), (1 - pi_1) * (1 - pi_2)])
+    weights = np.array([pi_1 * pi_2, (1 - pi_1) * pi_2, pi_1 * (1 - pi_2), (1 - pi_1) * (1 - pi_2)])
 
     # 2. Define the Mean Vectors for the 4 regimes
     mu_vectors = [
