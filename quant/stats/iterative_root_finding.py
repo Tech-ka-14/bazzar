@@ -40,16 +40,19 @@ def newton_raphson_method(func, deriv_func, x0, tol=1e-6, max_iter=100):
 
 
 if __name__ == "__main__":
-    # --- Example I.5.2: Finding a Root for f(x) = x^3 - 2x - 5 = 0 ---
-    def f(x):
-        return x**3 - 2 * x - 5
+    # --- Example I.5.2: Finding a Bond Yield ---
+    # 4-year bond, 5% annual coupon, market price = 92
 
-    def f_prime(x):
-        return 3 * x**2 - 2
+    # Objective function: PV(y) - MarketPrice = 0
+    def bond_pricing_error(y):
+        cash_flows = sum([5 / (1 + y) ** i for i in range(1, 5)]) + (100 / (1 + y) ** 4)
+        return cash_flows - 92.0
 
-    # Root lies between 2 and 3 because f(2) = -1 and f(3) = 16
-    root_bisect = bisection_method(f, 2, 3)
-    root_newton = newton_raphson_method(f, f_prime, x0=2.5)
+    # Derivative of the objective function w.r.t yield (y)
+    def bond_pricing_deriv(y):
+        deriv = sum([-5 * i / (1 + y) ** (i + 1) for i in range(1, 5)]) - (400 / (1 + y) ** 5)
+        return deriv
 
-    print(f"Bisection Method Root: {root_bisect:.6f}")
-    print(f"Newton-Raphson Root: {root_newton:.6f}")
+    # Use Newton-Raphson starting with a guess of 5% (0.05)
+    yield_estimate = newton_raphson_method(bond_pricing_error, bond_pricing_deriv, x0=0.05)
+    print(f"Estimated Bond Yield: {yield_estimate * 100:.2f}%")
