@@ -2,104 +2,54 @@ import numpy as np
 import scipy.stats as stats
 
 
-def z_test_population_mean(sample_data, mu0, sigma, alpha=0.05):
+def one_sample_t_test(sample_mean, pop_mean_h0, sample_std, n):
     """
-    Performs a two-sided Z-test for a population mean when variance is KNOWN.
+    Calculates the test statistic for a one-sample test on the mean.
+    Formula from text: t = (X_bar - mu) / s
+    Note: 's' in the text's example represents the standard error of the mean.
     """
-    n = len(sample_data)
-    x_bar = np.mean(sample_data)
-
-    # Calculate the Z-statistic
-    z_stat = (x_bar - mu0) / (sigma / np.sqrt(n))
-
-    # Calculate critical value and p-value for a two-tailed test
-    z_crit = stats.norm.ppf(1 - alpha / 2)
-    p_value = 2 * (1 - stats.norm.cdf(abs(z_stat)))
-
-    reject_null = abs(z_stat) > z_crit
-
-    print("--- Z-Test (Known Variance) ---")
-    print(f"H0: mu = {mu0} | Sample Mean: {x_bar:.4f}")
-    print(f"Z-statistic: {z_stat:.4f} | Critical Value: +/- {z_crit:.4f}")
-    print(f"P-value: {p_value:.4f}")
-    print(
-        f"Conclusion: {'Reject H0' if reject_null else 'Fail to reject H0'} at {alpha * 100}% significance.\n"
-    )
+    t_stat = (sample_mean - pop_mean_h0) / sample_std
+    return t_stat
 
 
-def t_test_population_mean(sample_data, mu0, alpha=0.05):
+def two_sample_t_test_means(mean1, mean2, var1, var2, n1, n2):
     """
-    Performs a two-sided t-test for a population mean when variance is UNKNOWN.
+    Calculates the t-statistic to test the equality of two means.
     """
-    n = len(sample_data)
-    x_bar = np.mean(sample_data)
-    s = np.std(sample_data, ddof=1)  # Sample standard deviation
-
-    # Calculate the t-statistic
-    t_stat = (x_bar - mu0) / (s / np.sqrt(n))
-
-    # Degrees of freedom = n - 1
-    df = n - 1
-
-    # Calculate critical value and p-value for a two-tailed test
-    t_crit = stats.t.ppf(1 - alpha / 2, df)
-    p_value = 2 * (1 - stats.t.cdf(abs(t_stat), df))
-
-    reject_null = abs(t_stat) > t_crit
-
-    print("--- t-Test (Unknown Variance) ---")
-    print(f"H0: mu = {mu0} | Sample Mean: {x_bar:.4f}")
-    print(f"t-statistic: {t_stat:.4f} | Critical Value: +/- {t_crit:.4f} (df={df})")
-    print(f"P-value: {p_value:.4f}")
-    print(
-        f"Conclusion: {'Reject H0' if reject_null else 'Fail to reject H0'} at {alpha * 100}% significance.\n"
-    )
+    standard_error = np.sqrt((var1 / n1) + (var2 / n2))
+    t_stat = (mean1 - mean2) / standard_error
+    return t_stat
 
 
-def chi_squared_test_variance(sample_data, sigma0_sq, alpha=0.05):
+def one_sample_chi2_test_variance(sample_var, pop_var_h0, n):
     """
-    Performs a two-sided Chi-squared test for a population variance.
+    Calculates the Chi-squared statistic to test a single variance.
     """
-    n = len(sample_data)
-    s_sq = np.var(sample_data, ddof=1)
-
-    # Calculate the Chi-squared statistic
-    chi2_stat = ((n - 1) * s_sq) / sigma0_sq
-
-    df = n - 1
-
-    # Calculate critical values for a two-tailed test
-    chi2_crit_lower = stats.chi2.ppf(alpha / 2, df)
-    chi2_crit_upper = stats.chi2.ppf(1 - alpha / 2, df)
-
-    # Calculate p-value
-    p_value = 2 * min(
-        stats.chi2.cdf(chi2_stat, df), 1 - stats.chi2.cdf(chi2_stat, df)
-    )
-
-    reject_null = (chi2_stat < chi2_crit_lower) or (chi2_stat > chi2_crit_upper)
-
-    print("--- Chi-Squared Test (Variance) ---")
-    print(f"H0: sigma^2 = {sigma0_sq} | Sample Variance: {s_sq:.4f}")
-    print(f"Chi2-statistic: {chi2_stat:.4f} | df={df}")
-    print(f"Critical Range: [{chi2_crit_lower:.4f}, {chi2_crit_upper:.4f}]")
-    print(f"P-value: {p_value:.4f}")
-    print(
-        f"Conclusion: {'Reject H0' if reject_null else 'Fail to reject H0'} at {alpha * 100}% significance.\n"
-    )
+    chi2_stat = ((n - 1) * sample_var) / pop_var_h0
+    return chi2_stat
 
 
-# --- Testing with hypothetical financial returns ---
-if __name__ == "__main__":
-    # Hypothetical sample of 20 daily returns
-    np.random.seed(42)
-    sample_returns = np.random.normal(0.001, 0.02, 20)
+def two_sample_f_test_variances(var1, var2, n1, n2):
+    """
+    Calculates the F-statistic to test the equality of two variances.
+    """
+    f_stat = var1 / var2
 
-    # Test if mean return is significantly different from 0 (assuming true vol is 2%)
-    z_test_population_mean(sample_returns, mu0=0, sigma=0.02, alpha=0.05)
+    # Calculate the p-value for the lower tail as per Example I.3.15
+    p_value = stats.f.cdf(f_stat, dfn=n1 - 1, dfd=n2 - 1)
+    return f_stat, p_value
 
-    # Test if mean return is significantly different from 0 (unknown vol)
-    t_test_population_mean(sample_returns, mu0=0, alpha=0.05)
 
-    # Test if variance is significantly different from 0.0004 (2% daily vol squared)
-    chi_squared_test_variance(sample_returns, sigma0_sq=0.0004, alpha=0.05)
+# --- Recreating Example I.3.15: Testing for Equality of Means and Variances ---
+# Sample 1 stats
+n1, mean1, var1 = 25, 1.0, 3.0
+# Sample 2 stats
+n2, mean2, var2 = 35, 2.0, 8.0
+
+print("Example I.3.15 Results:")
+f_stat, f_p_val = two_sample_f_test_variances(var1, var2, n1, n2)
+print(f"F-Statistic (Variances): {f_stat:.3f}")  # Expected: 0.375
+print(f"F-Test P-Value (lower tail): {f_p_val:.4f}")  # Expected: ~0.007
+
+t_stat = two_sample_t_test_means(mean1, mean2, var1, var2, n1, n2)
+print(f"t-Statistic (Means): {t_stat:.3f}")  # Expected: -1.697

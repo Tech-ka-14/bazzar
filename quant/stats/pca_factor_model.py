@@ -1,89 +1,80 @@
 import numpy as np
 
 
-def construct_statistical_factor_model(returns_matrix, k):
+def perform_pca(returns_matrix, use_correlation=False):
     """
-    Constructs a statistical factor model by extracting the first k principal
-    components from a matrix of asset returns.
+    Performs Principal Component Analysis (PCA) on a matrix of asset returns
+    to extract statistical risk factors.
 
     Parameters:
-    returns_matrix (numpy.ndarray): T x n matrix of asset returns (T periods, n assets).
-    k (int): Number of principal components (factors) to extract.
+    returns_matrix (numpy.ndarray): T x m matrix of historical returns
+                                    (T observations, m assets).
+    use_correlation (bool): If True, performs PCA on the correlation matrix
+                            instead of the covariance matrix.
 
     Returns:
-    tuple: (factors, betas, r_squared)
-           factors: T x k matrix of principal component returns.
-           betas: k x n matrix of factor sensitivities.
-           r_squared: Array of R^2 values for each asset's regression on the factors.
+    dict: A dictionary containing the Eigenvalues, Eigenvectors, Principal
+          Components (Scores), and the Explained Variance Ratio.
     """
-    T, n = returns_matrix.shape
-
-    # 1. Center the returns
+    # 1. Center the returns (subtract the mean of each asset's return)
     mean_returns = np.mean(returns_matrix, axis=0)
     centered_returns = returns_matrix - mean_returns
 
-    # 2. Compute the covariance matrix (n x n)
-    cov_matrix = np.cov(centered_returns, rowvar=False)
+    # 2. Compute the Covariance or Correlation Matrix
+    if use_correlation:
+        # rowvar=False means each column is a variable
+        dispersion_matrix = np.corrcoef(centered_returns, rowvar=False)
+    else:
+        dispersion_matrix = np.cov(centered_returns, rowvar=False)
 
-    # 3. Eigen-decomposition
-    eigenvalues, eigenvectors = np.linalg.eigh(cov_matrix)
+    # 3. Calculate Eigenvalues and Eigenvectors
+    # eigh is highly optimized for symmetric matrices like covariance/correlation matrices
+    eigenvalues, eigenvectors = np.linalg.eigh(dispersion_matrix)
 
-    # Sort eigenvalues and eigenvectors in descending order
+    # 4. Sort in descending order (largest eigenvalue first)
     sorted_indices = np.argsort(eigenvalues)[::-1]
-    sorted_eigenvectors = eigenvectors[:, sorted_indices]
+    eigenvalues = eigenvalues[sorted_indices]
+    eigenvectors = eigenvectors[:, sorted_indices]
 
-    # 4. Extract the first k principal components as our factors (T x k)
-    W_k = sorted_eigenvectors[:, :k]
-    factors = centered_returns @ W_k
+    # 5. Calculate the Principal Components (Statistical Risk Factors)
+    # P = X * W
+    principal_components = centered_returns @ eigenvectors
 
-    # 5. Run OLS for each asset against the k factors to find Betas
-    # Y = XB + E  =>  B = (X'X)^-1 X'Y
-    # Here X is the factors matrix (T x k), Y is the centered returns (T x n)
-    X = np.column_stack((np.ones(T), factors))  # Add intercept
+    # 6. Calculate Explained Variance (Percentage of total risk captured by each factor)
+    total_variance = np.sum(eigenvalues)
+    explained_variance_ratio = eigenvalues / total_variance
 
-    betas = []
-    r_squared = []
-
-    for i in range(n):
-        y = centered_returns[:, i]
-
-        # OLS
-        B = np.linalg.inv(X.T @ X) @ X.T @ y
-        betas.append(B[1:])  # Exclude intercept
-
-        # Calculate R^2
-        y_pred = X @ B
-        ss_res = np.sum((y - y_pred) ** 2)
-        ss_tot = np.sum((y - np.mean(y)) ** 2)
-        r_squared.append(1 - (ss_res / ss_tot))
-
-    return factors, np.array(betas).T, np.array(r_squared)
+    return {
+        "eigenvalues": eigenvalues,
+        "eigenvectors": eigenvectors,
+        "principal_components": principal_components,
+        "explained_variance_ratio": explained_variance_ratio,
+    }
 
 
 if __name__ == "__main__":
     # --- Example Application ---
-    # Simulate T=250 days of returns for n=10 stocks driven by 2 underlying factors
+    # Simulate T=250 days of returns for m=3 highly correlated assets
     np.random.seed(42)
-    T, n = 250, 10
+    T = 250
 
-    # Two underlying true factors
-    f1 = np.random.normal(0, 0.02, T)
-    f2 = np.random.normal(0, 0.01, T)
+    # Simulate a common market factor
+    market_factor = np.random.normal(0, 0.015, T)
 
-    # Simulate asset returns with different sensitivities to f1 and f2, plus noise
-    returns = np.zeros((T, n))
-    for i in range(n):
-        beta1 = np.random.uniform(0.5, 1.5)
-        beta2 = np.random.uniform(-0.5, 0.5)
-        noise = np.random.normal(0, 0.005, T)
-        returns[:, i] = beta1 * f1 + beta2 * f2 + noise
+    # Simulate 3 assets driven largely by the market factor + specific noise
+    asset_1 = 1.1 * market_factor + np.random.normal(0, 0.005, T)
+    asset_2 = 0.9 * market_factor + np.random.normal(0, 0.006, T)
+    asset_3 = 1.3 * market_factor + np.random.normal(0, 0.004, T)
 
-    # Construct the factor model with k=2
-    k = 2
-    factors, betas, r2 = construct_statistical_factor_model(returns, k)
+    portfolio_returns = np.column_stack((asset_1, asset_2, asset_3))
 
-    print("--- Statistical Factor Model (PCA) ---")
-    print(f"Shape of Extracted Factors: {factors.shape}")
-    print(f"Shape of Beta Matrix: {betas.shape}")
-    print("R-squared for each asset:")
-    print(np.round(r2, 4))
+    # Perform PCA using the Covariance Matrix
+    pca_results = perform_pca(portfolio_returns, use_correlation=False)
+
+    print("--- Principal Component Analysis (PCA) ---")
+    print("\nExplained Variance Ratio by Component:")
+    for i, var in enumerate(pca_results["explained_variance_ratio"]):
+        print(f"Principal Component {i + 1}: {var * 100:.2f}% of total risk")
+
+    print("\nEigenvector for Principal Component 1 (Factor Loadings):")
+    print(np.round(pca_results["eigenvectors"][:, 0], 4))

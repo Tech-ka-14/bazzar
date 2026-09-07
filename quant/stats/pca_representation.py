@@ -1,64 +1,47 @@
 import numpy as np
 
 
-def calculate_principal_component_representation(covariance_matrix, data_matrix):
+def reconstruct_from_pca(principal_components, eigenvectors, num_components):
     """
-    Decomposes a covariance matrix into its principal components and
-    calculates the PC representation of the data.
+    Approximates the original standardized variables (e.g., interest rate changes)
+    using a truncated set of principal components.
 
     Parameters:
-    covariance_matrix (numpy.ndarray): The (n x n) covariance matrix of the system.
-    data_matrix (numpy.ndarray): The (T x n) matrix of mean-deviated (centered) data.
+    principal_components (numpy.ndarray): T x n matrix of all principal component scores.
+    eigenvectors (numpy.ndarray): n x n matrix of eigenvectors (factor weights).
+    num_components (int): The number of components to keep (k).
 
     Returns:
-    tuple: (eigenvalues, eigenvectors, principal_components)
+    numpy.ndarray: T x n matrix of the approximated original variables.
     """
-    # 1. Perform Eigen-decomposition
-    # For symmetric matrices (like covariance matrices), np.linalg.eigh is faster and more stable
-    eigenvalues, eigenvectors = np.linalg.eigh(covariance_matrix)
+    # Truncate the components and the eigenvectors to the first 'k' dimensions
+    p_k = principal_components[:, :num_components]
+    w_k = eigenvectors[:, :num_components]
 
-    # np.linalg.eigh returns eigenvalues in ASCENDING order.
-    # We reverse them to get descending order (PC1, PC2, ..., PCn)
-    sorted_indices = np.argsort(eigenvalues)[::-1]
-    sorted_eigenvalues = eigenvalues[sorted_indices]
-    sorted_eigenvectors = eigenvectors[:, sorted_indices]
+    # Reconstruct the original variables: X_approx = P_k * W_k^T
+    # Note: Since the text defines it as weights * components for a single row,
+    # the matrix equivalent for the full dataset is P_k @ W_k.T
+    approximated_variables = p_k @ w_k.T
 
-    # 2. Calculate the Principal Components: P = X * W
-    # P is the (T x n) matrix of principal components
-    principal_components = data_matrix @ sorted_eigenvectors
-
-    # 3. Verify orthogonality of PCs (their covariance matrix should be diagonal)
-    pc_covariance = np.cov(principal_components, rowvar=False)
-
-    return sorted_eigenvalues, sorted_eigenvectors, principal_components, pc_covariance
+    return approximated_variables
 
 
 if __name__ == "__main__":
-    # --- Example Application ---
-    np.random.seed(42)
+    # --- Example Application (Replicating Eq II.2.6 structure) ---
+    T = 5  # 5 days of data
+    n = 50  # 50 yield curve rates
+    k = 3  # Keeping only Shift, Tilt, and Convexity components
 
-    # Simulate a 3-variable correlated system (e.g., 3 interest rates)
-    T = 500
-    base_factor = np.random.normal(0, 1, T)
+    # Synthetic principal component scores (T x k)
+    p_k_simulated = np.random.normal(0, 1, (T, k))
 
-    x1 = 1.5 * base_factor + np.random.normal(0, 0.2, T)
-    x2 = 1.2 * base_factor + np.random.normal(0, 0.5, T)
-    x3 = 0.5 * base_factor + np.random.normal(0, 0.8, T)
+    # Synthetic first 3 eigenvectors for 50 rates (n x k)
+    w_k_simulated = np.random.uniform(-0.2, 0.7, (n, k))
 
-    # Combine into a data matrix and center it
-    X = np.column_stack((x1, x2, x3))
-    X_centered = X - np.mean(X, axis=0)
+    # Reconstruct the 50 rates over 5 days using only the 3 components
+    reconstructed_rates = p_k_simulated @ w_k_simulated.T
 
-    # Calculate covariance matrix
-    V = np.cov(X_centered, rowvar=False)
-
-    evals, evecs, pcs, pc_cov = calculate_principal_component_representation(V, X_centered)
-
-    print("--- Principal Component Representation ---")
-    print(f"Eigenvalues (Variance explained by each PC): {np.round(evals, 4)}")
-    print(f"Total System Variance: {np.sum(evals):.4f}")
-    print(f"Variance Explained by PC1: {(evals[0] / np.sum(evals)) * 100:.2f}%\n")
-
-    print("Covariance Matrix of the Principal Components:")
-    print("(Notice the off-diagonal elements are virtually zero, proving they are uncorrelated)")
-    print(np.round(pc_cov, 10))
+    print("--- PCA Dimensionality Reduction ---")
+    print(f"Original shape required: {T} days x {n} rates")
+    print(f"Approximated using: {T} days of {k} components")
+    print(f"Shape of reconstructed data: {reconstructed_rates.shape}")
