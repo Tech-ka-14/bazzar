@@ -7,6 +7,7 @@ setup: ## Install all dependencies (Python + Node + hooks)
 	pip install -r requirements-dev.txt
 	npm install
 	pre-commit install
+
 check: ## Run the full quality gate (matches CI)
 	ruff check .
 	ruff format --check .
@@ -24,11 +25,13 @@ lint: ## Auto-fix lint issues (Python + JS)
 format: ## Format everything
 	ruff format .
 	npm run format
+
 test: ## Run test suites
 	pytest
 	npm run test
 
 build: ## Build the renderer
 	npm run build
+
 dev: ## Run the Vite dev server
 	npm run dev
