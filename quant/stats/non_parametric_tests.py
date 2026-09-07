@@ -1,46 +1,35 @@
 import numpy as np
-import scipy.stats as stats
 
 
-def perform_non_parametric_tests(sample1, sample2):
+def kolmogorov_smirnoff_statistic(f1_cdf_values, f2_cdf_values):
     """
-    Performs Sign Test, Wilcoxon Signed-Rank, and Kolmogorov-Smirnov tests
-    to compare two samples without assuming normality.
+    Calculates the KS test statistic: the maximum vertical difference
+    between two cumulative distribution functions.
     """
-    s1 = np.array(sample1)
-    s2 = np.array(sample2)
+    # Ensure inputs are numpy arrays
+    f1 = np.array(f1_cdf_values)
+    f2 = np.array(f2_cdf_values)
 
-    # 1. Sign Test (paired samples)
-    differences = s1 - s2
-    n_plus = np.sum(differences > 0)
-    n_minus = np.sum(differences < 0)
-    n_nonzero = n_plus + n_minus
-
-    # Under H0, the number of positive signs follows a Binomial(n, 0.5)
-    # Use the smaller of the two for a two-tailed test
-    x_stat = min(n_plus, n_minus)
-    sign_p_value = stats.binom.cdf(x_stat, n_nonzero, 0.5) * 2
-
-    # 2. Wilcoxon Signed-Rank Test (paired samples)
-    wilcoxon_stat, wilcoxon_p = stats.wilcoxon(s1, s2)
-
-    # 3. Kolmogorov-Smirnov Test (independent samples)
-    ks_stat, ks_p = stats.ks_2samp(s1, s2)
-
-    return {
-        "Sign Test": {"Positive Signs": n_plus, "Negative Signs": n_minus, "p-value": sign_p_value},
-        "Wilcoxon Signed-Rank": {"Statistic": wilcoxon_stat, "p-value": wilcoxon_p},
-        "Kolmogorov-Smirnov": {"Statistic": ks_stat, "p-value": ks_p},
-    }
+    ks_stat = np.max(np.abs(f1 - f2))
+    return ks_stat
 
 
-# --- Testing with Example I.3.17 from the text ---
-if __name__ == "__main__":
-    fund_A = [1.2, 2.1, -0.5, 1.8, 0.5, -1.2, 2.5, 1.0, -0.3, 1.5]
-    fund_B = [0.8, 1.5, -1.0, 1.2, 0.2, -0.8, 2.0, 0.5, -0.5, 1.0]
+def anderson_darling_statistic(f_empirical_values, f_hypothesized_values):
+    """
+    Calculates the specific AD statistic defined in the text,
+    designed to emphasize tail fit.
+    """
+    f_e = np.array(f_empirical_values)
+    f_h = np.array(f_hypothesized_values)
 
-    results = perform_non_parametric_tests(fund_A, fund_B)
+    # Avoid division by zero at the extreme edges (where F(x) = 0 or 1)
+    # by adding a tiny epsilon if necessary, though true CDFs evaluated
+    # strictly strictly inside the bounds usually avoid this.
+    epsilon = 1e-10
+    f_h_clamped = np.clip(f_h, epsilon, 1 - epsilon)
 
-    print("--- Non-Parametric Test Results ---")
-    for test, values in results.items():
-        print(f"{test}: {values}")
+    numerator = np.abs(f_e - f_h_clamped)
+    denominator = np.sqrt(f_h_clamped * (1 - f_h_clamped))
+
+    ad_stat = np.max(numerator / denominator)
+    return ad_stat

@@ -1,53 +1,66 @@
 import numpy as np
+import scipy.stats as stats
 import statsmodels.api as sm
 
 
-def run_ols_sampling_distribution_demo(
-    true_alpha, true_beta, x_range, error_std, n_samples, n_simulations
+def simulate_ols_sampling_distribution(
+    true_alpha, true_beta, error_volatility, sample_size, num_simulations
 ):
     """
-    Demonstrates that OLS estimators are random variables with their own
-    sampling distributions, centered on the true population parameters.
+    Demonstrates that the OLS estimator is a random variable with a normal
+    sampling distribution by running repeated regressions on simulated data.
     """
-    estimated_alphas = []
     estimated_betas = []
 
-    for _ in range(n_simulations):
-        # 1. Simulate a sample from the true population model
-        X_vals = np.random.uniform(x_range[0], x_range[1], n_samples)
-        # The true error process (unexplained noise)
-        errors = np.random.normal(0, error_std, n_samples)
+    # Generate the independent variable X once (fixed across samples for simplicity)
+    x = np.linspace(0, 10, sample_size)
+    x_with_constant = sm.add_constant(x)
 
-        # True structural relationship
-        Y_vals = true_alpha + true_beta * X_vals + errors
+    for _ in range(num_simulations):
+        # 1. Generate normal, i.i.d. errors for this specific sample
+        errors = np.random.normal(0, error_volatility, sample_size)
 
-        # 2. Estimate the model using OLS on this specific sample
-        X_design = sm.add_constant(X_vals)
-        model = sm.OLS(Y_vals, X_design)
+        # 2. Calculate the theoretical Y and add the random errors
+        y_sample = true_alpha + (true_beta * x) + errors
+
+        # 3. Apply the OLS Estimator to get the Estimate for this sample
+        model = sm.OLS(y_sample, x_with_constant)
         results = model.fit()
 
-        # Store the estimated parameters
-        estimated_alphas.append(results.params[0])
+        # Store the estimated beta
         estimated_betas.append(results.params[1])
 
-    # 3. Analyze the sampling distribution of the estimators
-    mean_alpha = np.mean(estimated_alphas)
-    std_alpha = np.std(estimated_alphas)
+    estimated_betas = np.array(estimated_betas)
 
-    mean_beta = np.mean(estimated_betas)
-    std_beta = np.std(estimated_betas)
+    # Calculate the properties of the estimator's sampling distribution
+    mean_of_estimates = np.mean(estimated_betas)
+    std_of_estimates = np.std(estimated_betas)
 
-    print("--- OLS Sampling Distribution Simulation ---")
-    print(f"True Population Alpha: {true_alpha:.2f}")
-    print(f"Mean of Estimated Alphas: {mean_alpha:.4f} (Should be very close to true)")
-    print(f"Std Dev of Alphas (Standard Error): {std_alpha:.4f}\n")
+    print(f"True Theoretical Beta: {true_beta}")
+    print(f"Mean of Estimated Betas: {mean_of_estimates:.4f}")
+    print(f"Standard Error of the Estimator (Simulated): {std_of_estimates:.4f}")
 
-    print(f"True Population Beta: {true_beta:.2f}")
-    print(f"Mean of Estimated Betas: {mean_beta:.4f} (Should be very close to true)")
-    print(f"Std Dev of Betas (Standard Error): {std_beta:.4f}")
+    # Test if the sampling distribution is Normal (Shapiro-Wilk test)
+    # A high p-value indicates we cannot reject the assumption of normality
+    _, p_value_normality = stats.shapiro(estimated_betas)
+    print(f"Normality Test p-value: {p_value_normality:.4f}")
+
+    return estimated_betas
 
 
-# Run the demonstration
-run_ols_sampling_distribution_demo(
-    true_alpha=5.0, true_beta=2.5, x_range=(0, 20), error_std=3.0, n_samples=50, n_simulations=1000
+# --- Run the Simulation ---
+# Set our theoretical "true" model parameters
+TRUE_ALPHA = 2.0
+TRUE_BETA = 1.5
+ERROR_VOL = 3.0
+N_OBSERVATIONS = 50
+N_SIMULATIONS = 1000
+
+print("Simulating the OLS Estimator Sampling Distribution...\n")
+beta_distribution = simulate_ols_sampling_distribution(
+    true_alpha=TRUE_ALPHA,
+    true_beta=TRUE_BETA,
+    error_volatility=ERROR_VOL,
+    sample_size=N_OBSERVATIONS,
+    num_simulations=N_SIMULATIONS,
 )

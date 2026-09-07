@@ -1,43 +1,60 @@
 import numpy as np
 
 
-def solve_homogeneous_system(matrix_list):
+def analyze_matrix(A_list):
     """
-    Solves a homogeneous system Ax = 0 and analyzes its solutions based on the determinant.
+    Computes the transpose, determinant, and inverse of a given square matrix A.
     """
-    A = np.array(matrix_list)
-    det_A = np.linalg.det(A)
-    n = A.shape[0]
+    A = np.array(A_list)
 
-    print(f"Matrix A:\n{A}")
-    print(f"Determinant of A: {det_A:.4f}")
+    print("Matrix A:")
+    print(A)
 
-    if abs(det_A) > 1e-10:
-        # Determinant is non-zero: A is non-singular
-        print("Conclusion: Unique solution exists (the trivial solution x = 0).")
-        solution = np.zeros(n)
-        print(f"Solution x: {solution}")
+    print("\nTranspose A':")
+    print(A.T)
+
+    # Check if the matrix is square
+    if A.shape[0] == A.shape[1]:
+        det_A = np.linalg.det(A)
+        print(f"\nDeterminant |A|: {det_A:.4f}")
+
+        # A matrix is only invertible if its determinant is non-zero
+        if not np.isclose(det_A, 0.0):
+            inv_A = np.linalg.inv(A)
+            print("\nInverse A^(-1):")
+            print(np.round(inv_A, 4))
+        else:
+            print("\nMatrix is singular (Determinant is 0). No inverse exists.")
     else:
-        # Determinant is zero: A is singular
-        print("Conclusion: Infinitely many solutions exist (A is singular).")
-        # Finding the null space of A to provide an example of a non-trivial solution
-        # Using SVD to find the null space vector
-        U, S, Vh = np.linalg.svd(A)
-        # The last row of Vh corresponds to the smallest singular value (the null space)
-        null_space_vector = Vh[-1, :]
-        print(f"Example of a non-trivial solution x: {np.round(null_space_vector, 4)}")
+        print("\nMatrix is not square. Determinant and Inverse are undefined.")
+
+
+def solve_linear_system(A_list, b_list):
+    """
+    Solves a system of simultaneous linear equations: Ax = b.
+    """
+    A = np.array(A_list)
+    b = np.array(b_list)
+
+    try:
+        # np.linalg.solve is numerically more stable/efficient than computing the inverse directly
+        x = np.linalg.solve(A, b)
+        print("\nSolution Vector x:")
+        print(x)
+        return x
+    except np.linalg.LinAlgError:
+        print("\nThe coefficient matrix A is singular. The system does not have a unique solution.")
+        return None
 
 
 # --- Testing with Examples from the text ---
 if __name__ == "__main__":
-    # Example I.2.4: Unique solution (det != 0)
-    print("--- Example I.2.4 ---")
-    A1 = [[1, -3, 2], [2, -5, 3], [-3, 8, -4]]
-    solve_homogeneous_system(A1)
+    # Example I.2.3 and I.2.4
+    A_matrix = [[1, -2, 3], [2, 4, 0], [0, 2, -1]]
+    b_vector = [1, 3, 0]
 
-    print("\n" + "=" * 40 + "\n")
+    print("--- Matrix Analysis (Example I.2.3) ---")
+    analyze_matrix(A_matrix)
 
-    # Example I.2.5: Infinitely many solutions (det = 0)
-    print("--- Example I.2.5 ---")
-    A2 = [[1, -3, 2], [2, -6, 4], [-3, 9, -6]]
-    solve_homogeneous_system(A2)
+    print("\n--- Solving Simultaneous Equations (Example I.2.4) ---")
+    solve_linear_system(A_matrix, b_vector)

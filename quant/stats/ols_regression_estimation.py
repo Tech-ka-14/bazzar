@@ -1,58 +1,84 @@
 import numpy as np
+import scipy.stats as stats
+import statsmodels.api as sm
 
 
-def simple_linear_regression(x_data, y_data):
+def estimate_simple_linear_regression(y, x):
     """
-    Fits a simple linear regression line Y = alpha + beta*X + error
-    using Ordinary Least Squares (OLS) matrix algebra.
-
-    Parameters:
-    x_data : list or 1D numpy array of independent variable observations
-    y_data : list or 1D numpy array of dependent variable observations
+    Fits an Ordinary Least Squares (OLS) regression model and
+    extracts the key metrics matching standard Excel/statistical output.
     """
-    n = len(x_data)
+    # In statsmodels, you must explicitly add a constant to fit an intercept
+    x_with_constant = sm.add_constant(x)
 
-    # 1. Setup the Design Matrix X (n x 2)
-    # Column 1 is all 1s (for the intercept/alpha), Column 2 is the x data
-    X = np.column_stack((np.ones(n), x_data))
+    # Fit the OLS model
+    model = sm.OLS(y, x_with_constant)
+    results = model.fit()
 
-    # Convert y_data to a column vector (n x 1)
-    y = np.array(y_data).reshape(n, 1)
+    # --- 1. Goodness of Fit (Table I.4.5 Equivalents) ---
+    r_squared = results.rsquared
+    adj_r_squared = results.rsquared_adj
+    standard_error = np.sqrt(results.mse_resid)
+    observations = int(results.nobs)
 
-    # 2. Calculate the OLS Estimator: beta_hat = (X'X)^-1 X'y
-    # X' is the transpose of X
-    X_prime_X = X.T @ X
-    X_prime_X_inv = np.linalg.inv(X_prime_X)
-    X_prime_y = X.T @ y
+    print(f"R-Squared: {r_squared:.4f}")
+    print(f"Adjusted R-Squared: {adj_r_squared:.4f}")
+    print(f"Standard Error: {standard_error:.4f}")
+    print(f"Observations: {observations}")
+    print("-" * 30)
 
-    # beta_hat contains [alpha_hat, beta_hat]
-    beta_hat = X_prime_X_inv @ X_prime_y
+    # --- 2. ANOVA (Table I.4.6 Equivalents) ---
+    ess = results.ess  # Explained Sum of Squares (Regression)
+    rss = results.ssr  # Residual Sum of Squares
+    tss = results.centered_tss  # Total Sum of Squares
+    f_stat = results.fvalue
 
-    alpha_hat = beta_hat[0, 0]
-    beta_hat_val = beta_hat[1, 0]
-
-    # 3. Calculate Residuals and Sum of Squared Errors (RSS)
-    # y_hat = X * beta_hat
-    y_hat = X @ beta_hat
-
-    # residuals e = y - y_hat
-    residuals = y - y_hat
-
-    # RSS = e'e (sum of squared residuals)
-    rss = (residuals.T @ residuals)[0, 0]
-
-    print(f"--- OLS Regression Results ---")
-    print(f"Estimated Intercept (alpha): {alpha_hat:.4f}")
-    print(f"Estimated Slope (beta):      {beta_hat_val:.4f}")
+    print(f"Explained Sum of Squares (ESS): {ess:.4f}")
     print(f"Residual Sum of Squares (RSS): {rss:.4f}")
+    print(f"Total Sum of Squares (TSS): {tss:.4f}")
+    print(f"F-Statistic: {f_stat:.4f}")
+    print("-" * 30)
 
-    return alpha_hat, beta_hat_val, rss
+    # --- 3. Coefficient Estimates (Table I.4.7 Equivalents) ---
+    # results.params contains [intercept, slope]
+    # results.bse contains standard errors
+    # results.tvalues contains t-stats for H0: beta = 0
+    # results.pvalues contains p-values
+
+    print("Coefficients:")
+    print(
+        f"Intercept: {results.params[0]:.4f} (SE: {results.bse[0]:.4f}, t: {results.tvalues[0]:.4f}, p: {results.pvalues[0]:.4f})"
+    )
+    print(
+        f"Slope (Beta): {results.params[1]:.4f} (SE: {results.bse[1]:.4f}, t: {results.tvalues[1]:.4f}, p: {results.pvalues[1]:.4f})"
+    )
+
+    return results
 
 
-# --- Testing with the concept from the text ---
-if __name__ == "__main__":
-    # Hypothetical data (e.g., advertising spend vs sales)
-    X_observed = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-    Y_observed = [2.1, 4.3, 5.8, 8.2, 9.9, 12.5, 13.8, 16.4, 18.1, 20.5]
+def custom_beta_hypothesis_test(beta_hat, standard_error, test_value=1.0, degrees_of_freedom=752):
+    """
+    Recreates the specific custom hypothesis test from the text:
+    H0: beta = 1 vs H1: beta > 1
+    """
+    t_stat = (beta_hat - test_value) / standard_error
 
-    simple_linear_regression(X_observed, Y_observed)
+    # One-sided upper tail p-value
+    p_value = 1 - stats.t.cdf(t_stat, df=degrees_of_freedom)
+
+    return t_stat, p_value
+
+
+# --- Recreating the Custom Hypothesis Test from the Text ---
+print("\n--- Custom Hypothesis Test (H0: beta = 1 vs H1: beta > 1) ---")
+# Using the values directly from Table I.4.7
+estimated_beta = 1.2885
+se_beta = 0.0427
+df = 752  # 754 observations - 2 parameters
+
+t_statistic, p_val = custom_beta_hypothesis_test(
+    estimated_beta, se_beta, test_value=1.0, degrees_of_freedom=df
+)
+print(f"Calculated t-statistic: {t_statistic:.4f}")  # Expected: ~6.756 (Text rounds to 6.76)
+print(f"P-value: {p_val:.6f}")
+print("Result: Reject H0. There is evidence to suggest the stock has a market beta > 1.")
