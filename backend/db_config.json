@@ -30,10 +30,7 @@
           "type": "BOOLEAN"
         }
       ],
-      "primary_key": [
-        "symbol",
-        "exchange"
-      ]
+      "primary_key": ["symbol", "exchange"]
     },
     "daily_ohlcv": {
       "columns": [
@@ -70,11 +67,7 @@
           "type": "BIGINT"
         }
       ],
-      "primary_key": [
-        "symbol",
-        "exchange",
-        "date"
-      ]
+      "primary_key": ["symbol", "exchange", "date"]
     },
     "index_master": {
       "columns": [
@@ -103,9 +96,7 @@
           "type": "INTEGER"
         }
       ],
-      "primary_key": [
-        "symbol"
-      ]
+      "primary_key": ["symbol"]
     },
     "index_daily": {
       "columns": [
@@ -134,10 +125,7 @@
           "type": "DOUBLE"
         }
       ],
-      "primary_key": [
-        "symbol",
-        "date"
-      ]
+      "primary_key": ["symbol", "date"]
     },
     "macro_series": {
       "columns": [
@@ -170,9 +158,7 @@
           "type": "VARCHAR"
         }
       ],
-      "primary_key": [
-        "key"
-      ]
+      "primary_key": ["key"]
     },
     "macro_observations": {
       "columns": [
@@ -189,10 +175,7 @@
           "type": "DOUBLE"
         }
       ],
-      "primary_key": [
-        "series_key",
-        "period"
-      ]
+      "primary_key": ["series_key", "period"]
     },
     "benchmark_series": {
       "columns": [
@@ -209,9 +192,7 @@
           "type": "VARCHAR"
         }
       ],
-      "primary_key": [
-        "key"
-      ]
+      "primary_key": ["key"]
     },
     "benchmark_observations": {
       "columns": [
@@ -228,10 +209,7 @@
           "type": "DOUBLE"
         }
       ],
-      "primary_key": [
-        "series_key",
-        "date"
-      ]
+      "primary_key": ["series_key", "date"]
     },
     "fetch_checkpoint": {
       "columns": [
@@ -248,9 +226,7 @@
           "type": "TIMESTAMP"
         }
       ],
-      "primary_key": [
-        "job"
-      ]
+      "primary_key": ["job"]
     }
   },
   "fetch_policy": {
