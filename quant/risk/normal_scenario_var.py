@@ -33,4 +33,5 @@ def multivariate_scenario_var(
     expected_portfolio_change = exposures.T @ expected_changes
 
     var = (z_score * portfolio_volatility) - expected_portfolio_change
+
     return var
