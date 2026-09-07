@@ -29,9 +29,7 @@ def default_start() -> str:
 
 
 def get_checkpoint(con, job: str) -> str | None:
-    row = con.execute(
-        "SELECT last_symbol FROM fetch_checkpoint WHERE job = ?", (job,)
-    ).fetchone()
+    row = con.execute("SELECT last_symbol FROM fetch_checkpoint WHERE job = ?", (job,)).fetchone()
     return row[0] if row else None
 
 
@@ -51,8 +49,10 @@ def upsert_bars(con, symbol: str, exchange: str, bars: list[dict]) -> int:
         " ON CONFLICT (symbol, exchange, date) DO UPDATE SET open = excluded.open,"
         " high = excluded.high, low = excluded.low, close = excluded.close,"
         " volume = excluded.volume",
-        [(symbol, exchange, b["date"], b["open"], b["high"], b["low"], b["close"],
-          b["volume"]) for b in bars],
+        [
+            (symbol, exchange, b["date"], b["open"], b["high"], b["low"], b["close"], b["volume"])
+            for b in bars
+        ],
     )
     return len(bars)
 
@@ -83,8 +83,10 @@ def run(start: str, end: str) -> int:
         return 0
 
     client = OpenAlgoClient()
-    print(f"Fetching daily OHLCV for {len(todo)} securities ({start} -> {end}),"
-          f" strict alphabetical order, interval 'D'.")
+    print(
+        f"Fetching daily OHLCV for {len(todo)} securities ({start} -> {end}),"
+        f" strict alphabetical order, interval 'D'."
+    )
     total = 0
     for symbol, exchange in todo:
         con = get_connection()
@@ -105,12 +107,14 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="python3 -m backend.fetch_daily",
         description="Fetch daily OHLCV for all active securities (alphabetical,"
-                    " checkpointed, daily interval only).",
+        " checkpointed, daily interval only).",
     )
-    parser.add_argument("--start", default=default_start(),
-                        help="start date YYYY-MM-DD (default: 10 years ago)")
-    parser.add_argument("--end", default=dt.date.today().isoformat(),
-                        help="end date YYYY-MM-DD (default: today)")
+    parser.add_argument(
+        "--start", default=default_start(), help="start date YYYY-MM-DD (default: 10 years ago)"
+    )
+    parser.add_argument(
+        "--end", default=dt.date.today().isoformat(), help="end date YYYY-MM-DD (default: today)"
+    )
     return parser
 
 

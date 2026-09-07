@@ -14,7 +14,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import duckdb
 
@@ -23,10 +23,10 @@ REPO_ROOT = PACKAGE_DIR.parent
 DEFAULT_CONFIG_PATH = PACKAGE_DIR / "db_config.json"
 
 
-def load_config(path: Optional[str] = None) -> dict[str, Any]:
+def load_config(path: str | None = None) -> dict[str, Any]:
     """Load the database setup configuration (defaults to backend/db_config.json)."""
     config_path = Path(path) if path else DEFAULT_CONFIG_PATH
-    with open(config_path, "r", encoding="utf-8") as fh:
+    with open(config_path, encoding="utf-8") as fh:
         return json.load(fh)
 
 
@@ -70,8 +70,7 @@ def _seed_index_master(con: duckdb.DuckDBPyConnection, config: dict[str, Any]) -
     con.executemany(
         "INSERT INTO index_master (symbol, name, exchange, category, active, sort_order)"
         " VALUES (?, ?, ?, ?, TRUE, ?)",
-        [(d["symbol"], d["name"], d["exchange"], d["category"], d["sort_order"])
-         for d in indices],
+        [(d["symbol"], d["name"], d["exchange"], d["category"], d["sort_order"]) for d in indices],
     )
     return len(indices)
 
@@ -82,8 +81,18 @@ def _seed_macro_series(con: duckdb.DuckDBPyConnection, config: dict[str, Any]) -
     con.executemany(
         "INSERT INTO macro_series (key, title, category, unit, frequency, source, source_url)"
         " VALUES (?, ?, ?, ?, ?, ?, ?)",
-        [(m["key"], m["title"], m["category"], m["unit"], m["frequency"],
-          m["source"], m["source_url"]) for m in entries],
+        [
+            (
+                m["key"],
+                m["title"],
+                m["category"],
+                m["unit"],
+                m["frequency"],
+                m["source"],
+                m["source_url"],
+            )
+            for m in entries
+        ],
     )
     return len(entries)
 
@@ -101,7 +110,7 @@ def _seed_benchmark_series(con: duckdb.DuckDBPyConnection, config: dict[str, Any
     return count
 
 
-def initialize_database(config_path: Optional[str] = None) -> dict[str, int]:
+def initialize_database(config_path: str | None = None) -> dict[str, int]:
     """Create every table defined in db_config.json and seed the config-derived
     reference tables (index_master, macro_series, benchmark_series).
 

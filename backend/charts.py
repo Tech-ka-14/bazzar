@@ -13,8 +13,9 @@ served by backend.server. No TradingView / lightweight-charts anywhere.
 from __future__ import annotations
 
 import datetime as dt
+from collections.abc import Iterable, Sequence
 from pathlib import Path
-from typing import Any, Iterable, Optional, Sequence
+from typing import Any
 
 import matplotlib
 
@@ -35,18 +36,20 @@ UP = "#22c55e"
 DOWN = "#ef4444"
 TEXT = "#d1d5db"
 
-plt.rcParams.update({
-    "figure.facecolor": BG,
-    "axes.facecolor": PANEL,
-    "axes.edgecolor": GRID,
-    "axes.labelcolor": TEXT,
-    "text.color": TEXT,
-    "xtick.color": TEXT,
-    "ytick.color": TEXT,
-    "grid.color": GRID,
-    "font.size": 9,
-    "savefig.facecolor": BG,
-})
+plt.rcParams.update(
+    {
+        "figure.facecolor": BG,
+        "axes.facecolor": PANEL,
+        "axes.edgecolor": GRID,
+        "axes.labelcolor": TEXT,
+        "text.color": TEXT,
+        "xtick.color": TEXT,
+        "ytick.color": TEXT,
+        "grid.color": GRID,
+        "font.size": 9,
+        "savefig.facecolor": BG,
+    }
+)
 
 
 def chart_cache_dir() -> Path:
@@ -88,14 +91,17 @@ def render_candles_png(rows: Iterable[dict], title: str, out_path: str) -> str:
     highs = [float(b["high"]) for b in bars]
     lows = [float(b["low"]) for b in bars]
     closes = [float(b["close"]) for b in bars]
-    volumes: list[Optional[float]] = [
+    volumes: list[float | None] = [
         float(b["volume"]) if b.get("volume") is not None else None for b in bars
     ]
     has_volume = any(v is not None for v in volumes)
 
     if has_volume:
         fig, (ax, axv) = plt.subplots(
-            2, 1, figsize=(10, 6), sharex=True,
+            2,
+            1,
+            figsize=(10, 6),
+            sharex=True,
             gridspec_kw={"height_ratios": [3, 1], "hspace": 0.05},
         )
     else:
@@ -104,15 +110,22 @@ def render_candles_png(rows: Iterable[dict], title: str, out_path: str) -> str:
 
     xs = list(range(len(bars)))
     width = 0.7
-    for x, o, h, l, c in zip(xs, opens, highs, lows, closes):
+    for x, o, h, low, c in zip(xs, opens, highs, lows, closes, strict=True):
         color = UP if c >= o else DOWN
-        ax.vlines(x, l, h, color=color, linewidth=0.8, zorder=2)
+        ax.vlines(x, low, h, color=color, linewidth=0.8, zorder=2)
         body_low, body_high = min(o, c), max(o, c)
         if body_high - body_low < 1e-12:
             body_high = body_low + max(abs(body_low), 1.0) * 1e-4
-        ax.add_patch(Rectangle((x - width / 2, body_low), width,
-                               body_high - body_low,
-                               facecolor=color, edgecolor=color, zorder=3))
+        ax.add_patch(
+            Rectangle(
+                (x - width / 2, body_low),
+                width,
+                body_high - body_low,
+                facecolor=color,
+                edgecolor=color,
+                zorder=3,
+            )
+        )
     _style(ax, title)
     ax.set_xlim(-1, len(bars))
     ax.margins(y=0.08)
@@ -122,9 +135,13 @@ def render_candles_png(rows: Iterable[dict], title: str, out_path: str) -> str:
     tick_labels = [dates[i].isoformat() for i in tick_pos]
 
     if axv is not None:
-        axv.bar(xs, [v or 0.0 for v in volumes], width=width,
-                color=[UP if c >= o else DOWN for o, c in zip(opens, closes)],
-                alpha=0.6)
+        axv.bar(
+            xs,
+            [v or 0.0 for v in volumes],
+            width=width,
+            color=[UP if c >= o else DOWN for o, c in zip(opens, closes, strict=True)],
+            alpha=0.6,
+        )
         axv.grid(True, linewidth=0.5, alpha=0.7)
         axv.tick_params(length=0)
         for spine in axv.spines.values():
@@ -138,8 +155,15 @@ def render_candles_png(rows: Iterable[dict], title: str, out_path: str) -> str:
 
     last = closes[-1]
     ax.axhline(last, color=GOLD, linewidth=0.7, alpha=0.6, linestyle="--")
-    ax.annotate(f"{last:,.2f}", xy=(len(bars) - 1, last), color=GOLD,
-                fontsize=8, xytext=(4, 0), textcoords="offset points", va="center")
+    ax.annotate(
+        f"{last:,.2f}",
+        xy=(len(bars) - 1, last),
+        color=GOLD,
+        fontsize=8,
+        xytext=(4, 0),
+        textcoords="offset points",
+        va="center",
+    )
 
     out = Path(out_path)
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -148,8 +172,13 @@ def render_candles_png(rows: Iterable[dict], title: str, out_path: str) -> str:
     return str(out)
 
 
-def render_line_png(points: Sequence[tuple], title: str, unit: str, out_path: str,
-                    series_labels: Optional[Sequence[str]] = None) -> str:
+def render_line_png(
+    points: Sequence[Any],  # single series [(date, value), ...] or list of series
+    title: str,
+    unit: str,
+    out_path: str,
+    series_labels: Sequence[str] | None = None,
+) -> str:
     """Render one or more line series to a PNG.
 
     points: either [(date, value), ...] for a single series, or a list of
@@ -158,7 +187,7 @@ def render_line_png(points: Sequence[tuple], title: str, unit: str, out_path: st
     Returns the output PNG path.
     """
     if series_labels is not None:
-        series_list = [sorted(s, key=lambda p: str(p[0])) for s in points]  # type: ignore[arg-type]
+        series_list = [sorted(s, key=lambda p: str(p[0])) for s in points]
     else:
         series_list = [sorted(points, key=lambda p: str(p[0]))]
     if not any(series_list):
@@ -173,9 +202,15 @@ def render_line_png(points: Sequence[tuple], title: str, unit: str, out_path: st
         ys = [float(p[1]) for p in series]
         label = series_labels[i] if series_labels is not None else None
         ax.plot(xs, ys, color=palette[i % len(palette)], linewidth=1.4, label=label)
-        ax.annotate(f"{ys[-1]:,.2f}", xy=(xs[-1], ys[-1]),
-                    color=palette[i % len(palette)], fontsize=8,
-                    xytext=(4, 0), textcoords="offset points", va="center")
+        ax.annotate(
+            f"{ys[-1]:,.2f}",
+            xy=(xs[-1], ys[-1]),
+            color=palette[i % len(palette)],
+            fontsize=8,
+            xytext=(4, 0),
+            textcoords="offset points",
+            va="center",
+        )
 
     _style(ax, title)
     if unit:
