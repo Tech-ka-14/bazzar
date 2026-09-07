@@ -71,7 +71,10 @@ export default function Scraper() {
   const handleStart = () =>
     guard(async () => {
       setResult(null);
-      const snap = await window.bazzar.scraperStart({ mode, url: mode === 'url' ? url : undefined });
+      const snap = await window.bazzar.scraperStart({
+        mode,
+        url: mode === 'url' ? url : undefined,
+      });
       applySnapshot(snap);
     });
   const handlePause = () => guard(async () => applySnapshot(await window.bazzar.scraperPause()));
@@ -89,8 +92,8 @@ export default function Scraper() {
       <div className={theme.card}>
         <h2 className={`text-xl font-bold ${theme.goldText} mb-2`}>Scraper Test-Bench</h2>
         <p className="text-gray-300">
-          The scraper runs inside the Electron main process. Launch the desktop app
-          (<code className="text-yellow-500">npm start</code> or the installed Bazzar Terminal) to
+          The scraper runs inside the Electron main process. Launch the desktop app (
+          <code className="text-yellow-500">npm start</code> or the installed Bazzar Terminal) to
           use this tab; it is unavailable in plain browser mode.
         </p>
       </div>
@@ -100,7 +103,12 @@ export default function Scraper() {
   const status = snapshot?.status ?? 'idle';
   const processed = snapshot?.progress?.processed ?? 0;
   const total = snapshot?.progress?.total ?? 0;
-  const pct = total > 0 ? Math.min(100, Math.round((processed / total) * 100)) : status === 'completed' ? 100 : 0;
+  const pct =
+    total > 0
+      ? Math.min(100, Math.round((processed / total) * 100))
+      : status === 'completed'
+        ? 100
+        : 0;
   const analysis = result?.analysis ?? null;
 
   return (
@@ -116,11 +124,21 @@ export default function Scraper() {
 
         <div className="flex flex-wrap items-center gap-4 mb-4">
           <label className="flex items-center gap-2 text-sm text-gray-300">
-            <input type="radio" name="scrape-mode" checked={mode === 'sample'} onChange={() => setMode('sample')} />
+            <input
+              type="radio"
+              name="scrape-mode"
+              checked={mode === 'sample'}
+              onChange={() => setMode('sample')}
+            />
             Offline sample data (no network)
           </label>
           <label className="flex items-center gap-2 text-sm text-gray-300">
-            <input type="radio" name="scrape-mode" checked={mode === 'url'} onChange={() => setMode('url')} />
+            <input
+              type="radio"
+              name="scrape-mode"
+              checked={mode === 'url'}
+              onChange={() => setMode('url')}
+            />
             Fetch CSV/JSON URL
           </label>
           {mode === 'url' && (
@@ -137,7 +155,9 @@ export default function Scraper() {
         <div className="flex flex-wrap gap-3 mb-4">
           <button
             onClick={handleStart}
-            disabled={status === 'running' || status === 'paused' || (mode === 'url' && !url.trim())}
+            disabled={
+              status === 'running' || status === 'paused' || (mode === 'url' && !url.trim())
+            }
             className={`px-4 py-2 rounded font-bold ${theme.goldBg} disabled:opacity-40 disabled:cursor-not-allowed`}
           >
             Start Scrape
@@ -173,7 +193,9 @@ export default function Scraper() {
         </div>
 
         <div className="flex items-center gap-4 mb-2">
-          <span className={`px-3 py-1 rounded border text-sm font-bold uppercase ${STATUS_STYLES[status] || STATUS_STYLES.idle}`}>
+          <span
+            className={`px-3 py-1 rounded border text-sm font-bold uppercase ${STATUS_STYLES[status] || STATUS_STYLES.idle}`}
+          >
             {status}
           </span>
           <div className="flex-1 h-3 bg-gray-800 rounded overflow-hidden">
@@ -244,7 +266,9 @@ export default function Scraper() {
                         <td className="py-1 pr-4 text-right text-gray-300">{m.open}</td>
                         <td className="py-1 pr-4 text-right text-gray-300">{m.close}</td>
                         <td className="py-1 pr-4 text-right text-yellow-500">{m.absChange}</td>
-                        <td className={`py-1 text-right ${m.pctChange >= 0 ? theme.profit : theme.loss}`}>
+                        <td
+                          className={`py-1 text-right ${m.pctChange >= 0 ? theme.profit : theme.loss}`}
+                        >
                           {m.pctChange >= 0 ? '+' : ''}
                           {m.pctChange}%
                         </td>
@@ -283,7 +307,9 @@ export default function Scraper() {
                         <td className="py-1 pr-4 text-right text-gray-300">{r.high}</td>
                         <td className="py-1 pr-4 text-right text-gray-300">{r.low}</td>
                         <td className="py-1 pr-4 text-right text-gray-300">{r.close}</td>
-                        <td className="py-1 text-right text-gray-300">{r.volume?.toLocaleString()}</td>
+                        <td className="py-1 text-right text-gray-300">
+                          {r.volume?.toLocaleString()}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
