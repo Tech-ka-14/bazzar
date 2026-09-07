@@ -17,8 +17,8 @@ const IndexContribution = () => {
         <div>
           <h3 className={`text-xl font-bold ${theme.goldText}`}>Index Contribution</h3>
           <p className="text-gray-400 text-sm mt-1">
-            Select an index to view its backend chart. Constituent-level point
-            contributions will appear here once exposed by the data platform.
+            Select an index to view its backend chart. Constituent-level point contributions will
+            appear here once exposed by the data platform.
           </p>
         </div>
       </header>
@@ -30,7 +30,8 @@ const IndexContribution = () => {
       {selection ? (
         <>
           <p className="text-sm text-gray-400 mb-2">
-            {selection.name} ({selection.symbol}{selection.exchange ? ` · ${selection.exchange}` : ''})
+            {selection.name} ({selection.symbol}
+            {selection.exchange ? ` · ${selection.exchange}` : ''})
           </p>
           <ChartImage
             src={chartUrl('indices', selection.symbol)}

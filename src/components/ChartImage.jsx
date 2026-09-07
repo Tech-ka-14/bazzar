@@ -3,7 +3,11 @@ import React, { useEffect, useState } from 'react';
 // Renders a backend matplotlib PNG chart via a plain <img> tag with an
 // explicit loading state and an error/empty state (e.g. when the backend
 // has no data yet and returns 404/empty).
-export default function ChartImage({ src, alt = 'Chart', className = 'w-full rounded bg-gray-950' }) {
+export default function ChartImage({
+  src,
+  alt = 'Chart',
+  className = 'w-full rounded bg-gray-950',
+}) {
   const [status, setStatus] = useState(src ? 'loading' : 'empty');
 
   useEffect(() => {

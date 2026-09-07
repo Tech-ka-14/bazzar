@@ -20,7 +20,8 @@ function ChangeValue({ change }) {
   const up = change >= 0;
   return (
     <span className={up ? theme.profit : theme.loss}>
-      {up ? '▲' : '▼'} {change > 0 ? '+' : ''}{change.toFixed(2)}
+      {up ? '▲' : '▼'} {change > 0 ? '+' : ''}
+      {change.toFixed(2)}
     </span>
   );
 }
@@ -81,18 +82,26 @@ export default function Benchmarks() {
           const series = (group && group.series) || [];
           return (
             <section key={key} className={theme.card}>
-              <h3 className={`text-xl mb-4 ${theme.goldText}`}>{(group && group.title) || fallbackTitle}</h3>
-              <ChartImage src={chartUrl('benchmarks', key)} alt={`${(group && group.title) || fallbackTitle} chart`} />
+              <h3 className={`text-xl mb-4 ${theme.goldText}`}>
+                {(group && group.title) || fallbackTitle}
+              </h3>
+              <ChartImage
+                src={chartUrl('benchmarks', key)}
+                alt={`${(group && group.title) || fallbackTitle} chart`}
+              />
               <div className="mt-4 space-y-2">
-                {series.length === 0 && (
-                  <p className="text-gray-500 text-sm">awaiting data sync</p>
-                )}
+                {series.length === 0 && <p className="text-gray-500 text-sm">awaiting data sync</p>}
                 {series.map((row) => (
-                  <div key={row.name} className="flex justify-between items-center bg-gray-800 p-2 rounded text-sm">
+                  <div
+                    key={row.name}
+                    className="flex justify-between items-center bg-gray-800 p-2 rounded text-sm"
+                  >
                     <span className="text-white">{row.name}</span>
                     <span className="flex items-center gap-4">
                       <span className="text-white">
-                        {formatValue(row.latest, group && group.unit) || <span className="text-gray-500">—</span>}
+                        {formatValue(row.latest, group && group.unit) || (
+                          <span className="text-gray-500">—</span>
+                        )}
                       </span>
                       <ChangeValue change={row.change} />
                     </span>
@@ -107,21 +116,29 @@ export default function Benchmarks() {
       {/* Macroeconomic indicators grouped by category */}
       <section>
         <h3 className={`text-2xl mb-4 font-bold ${theme.goldText}`}>Macroeconomic Indicators</h3>
-        {macroError && <p className="text-gray-500 text-sm">Macro feed unavailable — awaiting data sync.</p>}
+        {macroError && (
+          <p className="text-gray-500 text-sm">Macro feed unavailable — awaiting data sync.</p>
+        )}
         {!macroError && macro.length === 0 && (
           <p className="text-gray-500 text-sm">awaiting data sync</p>
         )}
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
           {Object.entries(macroByCategory).map(([category, items]) => (
             <div key={category} className={theme.card}>
-              <h4 className={`text-lg font-bold mb-3 border-b border-gray-700 pb-2 ${theme.goldText}`}>{category}</h4>
+              <h4
+                className={`text-lg font-bold mb-3 border-b border-gray-700 pb-2 ${theme.goldText}`}
+              >
+                {category}
+              </h4>
               <ul className="space-y-3">
                 {items.map((item) => (
                   <li key={item.key || item.title} className="text-sm">
                     <div className="flex justify-between items-baseline gap-2">
                       <span className="text-white">{item.title}</span>
                       <span className="text-white font-semibold">
-                        {formatValue(item.latest, item.unit) || <span className="text-gray-500">awaiting data sync</span>}
+                        {formatValue(item.latest, item.unit) || (
+                          <span className="text-gray-500">awaiting data sync</span>
+                        )}
                       </span>
                     </div>
                     <div className="flex justify-between items-baseline gap-2 text-xs text-gray-400">
@@ -131,7 +148,12 @@ export default function Benchmarks() {
                     {item.source && (
                       <div className="text-xs text-gray-500 mt-1">
                         {item.sourceUrl ? (
-                          <a href={item.sourceUrl} target="_blank" rel="noreferrer" className="hover:text-yellow-500">
+                          <a
+                            href={item.sourceUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="hover:text-yellow-500"
+                          >
                             Source: {item.source}
                           </a>
                         ) : (

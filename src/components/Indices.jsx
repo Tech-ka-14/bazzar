@@ -48,8 +48,7 @@ export default function Indices() {
     if (!q) return indices;
     return indices.filter(
       (row) =>
-        (row.symbol || '').toLowerCase().includes(q) ||
-        (row.name || '').toLowerCase().includes(q)
+        (row.symbol || '').toLowerCase().includes(q) || (row.name || '').toLowerCase().includes(q)
     );
   }, [indices, filter]);
 
@@ -71,7 +70,9 @@ export default function Indices() {
               Clear: {filter}
             </button>
           )}
-          <span className="text-gray-400 text-sm">{visible.length} of {indices.length} indices</span>
+          <span className="text-gray-400 text-sm">
+            {visible.length} of {indices.length} indices
+          </span>
         </div>
       </div>
 
@@ -95,22 +96,27 @@ export default function Indices() {
         </div>
       )}
 
-      {error && <p className="text-gray-500 text-sm mb-4">Index feed unavailable — awaiting data sync.</p>}
+      {error && (
+        <p className="text-gray-500 text-sm mb-4">Index feed unavailable — awaiting data sync.</p>
+      )}
 
       <div className="overflow-x-auto">
         <table className="w-full text-left text-sm">
           <thead>
             <tr className="border-b border-gray-700 text-gray-400">
               {COLUMNS.map((col) => (
-                <th key={col.key} className={`py-2 px-2 ${col.numeric ? 'text-right' : ''}`}>{col.label}</th>
+                <th key={col.key} className={`py-2 px-2 ${col.numeric ? 'text-right' : ''}`}>
+                  {col.label}
+                </th>
               ))}
             </tr>
           </thead>
           <tbody>
             {visible.map((row) => {
-              const closeUp = typeof row.close === 'number' && typeof row.open === 'number'
-                ? row.close >= row.open
-                : null;
+              const closeUp =
+                typeof row.close === 'number' && typeof row.open === 'number'
+                  ? row.close >= row.open
+                  : null;
               return (
                 <tr
                   key={row.symbol}
@@ -122,7 +128,9 @@ export default function Indices() {
                   <td className="py-2 px-2 text-right">{formatNumber(row.open)}</td>
                   <td className="py-2 px-2 text-right">{formatNumber(row.high)}</td>
                   <td className="py-2 px-2 text-right">{formatNumber(row.low)}</td>
-                  <td className={`py-2 px-2 text-right ${closeUp === null ? '' : closeUp ? theme.profit : theme.loss}`}>
+                  <td
+                    className={`py-2 px-2 text-right ${closeUp === null ? '' : closeUp ? theme.profit : theme.loss}`}
+                  >
                     {formatNumber(row.close)}
                   </td>
                   <td className="py-2 px-2 text-right">{formatNumber(row.yearLow)}</td>
