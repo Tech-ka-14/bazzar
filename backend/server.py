@@ -15,7 +15,7 @@ from __future__ import annotations
 import os
 import re
 from contextlib import contextmanager
-from typing import Any, Optional
+from typing import Any
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -55,34 +55,46 @@ def db():
 
 # --- helpers ---------------------------------------------------------------
 
+
 def _rows_to_bars(rows) -> list[dict[str, Any]]:
-    return [{"date": str(r[0])[:10], "open": r[1], "high": r[2], "low": r[3],
-             "close": r[4], "volume": r[5] if len(r) > 5 else None} for r in rows]
+    return [
+        {
+            "date": str(r[0])[:10],
+            "open": r[1],
+            "high": r[2],
+            "low": r[3],
+            "close": r[4],
+            "volume": r[5] if len(r) > 5 else None,
+        }
+        for r in rows
+    ]
 
 
 def _index_bars(con, symbol: str) -> list[dict[str, Any]]:
     rows = con.execute(
-        "SELECT date, open, high, low, close FROM index_daily"
-        " WHERE symbol = ? ORDER BY date", (symbol,)
+        "SELECT date, open, high, low, close FROM index_daily WHERE symbol = ? ORDER BY date",
+        (symbol,),
     ).fetchall()
     return _rows_to_bars(rows)
 
 
-def _stock_bars(con, symbol: str, exchange: Optional[str]) -> list[dict[str, Any]]:
+def _stock_bars(con, symbol: str, exchange: str | None) -> list[dict[str, Any]]:
     if exchange:
         rows = con.execute(
             "SELECT date, open, high, low, close, volume FROM daily_ohlcv"
-            " WHERE symbol = ? AND exchange = ? ORDER BY date", (symbol, exchange)
+            " WHERE symbol = ? AND exchange = ? ORDER BY date",
+            (symbol, exchange),
         ).fetchall()
     else:
         rows = con.execute(
             "SELECT date, open, high, low, close, volume FROM daily_ohlcv"
-            " WHERE symbol = ? ORDER BY date", (symbol,)
+            " WHERE symbol = ? ORDER BY date",
+            (symbol,),
         ).fetchall()
     return _rows_to_bars(rows)
 
 
-def _latest_quote(con, symbol: str, exchange: Optional[str]) -> Optional[dict[str, Any]]:
+def _latest_quote(con, symbol: str, exchange: str | None) -> dict[str, Any] | None:
     """Latest close + pointwise/% change from the last two stored bars.
 
     Index symbols (exchange ends with _INDEX) read index_daily; anything else
@@ -101,10 +113,8 @@ def _latest_quote(con, symbol: str, exchange: Optional[str]) -> Optional[dict[st
     last = bars[-1]
     prev_close = bars[-2]["close"] if len(bars) > 1 else None
     change = round(last["close"] - prev_close, 4) if prev_close is not None else None
-    change_pct = (round(change / prev_close * 100, 4)
-                  if prev_close not in (None, 0) else None)
-    return {"value": last["close"], "change": change,
-            "changePct": change_pct, "asOf": last["date"]}
+    change_pct = round(change / prev_close * 100, 4) if prev_close not in (None, 0) else None
+    return {"value": last["close"], "change": change, "changePct": change_pct, "asOf": last["date"]}
 
 
 def _sanitize(name: str) -> str:
@@ -112,6 +122,7 @@ def _sanitize(name: str) -> str:
 
 
 # --- endpoints ---------------------------------------------------------------
+
 
 @app.get("/api/health")
 def health() -> dict[str, Any]:
@@ -133,14 +144,16 @@ def home_indices() -> list[dict[str, Any]]:
     with db() as con:
         for entry in config["home_indices"]:
             quote = _latest_quote(con, entry["symbol"], entry["exchange"]) or {}
-            out.append({
-                "name": entry["name"],
-                "symbol": entry["symbol"],
-                "value": quote.get("value"),
-                "change": quote.get("change"),
-                "changePct": quote.get("changePct"),
-                "asOf": quote.get("asOf"),
-            })
+            out.append(
+                {
+                    "name": entry["name"],
+                    "symbol": entry["symbol"],
+                    "value": quote.get("value"),
+                    "change": quote.get("change"),
+                    "changePct": quote.get("changePct"),
+                    "asOf": quote.get("asOf"),
+                }
+            )
     return out
 
 
@@ -163,12 +176,21 @@ def indices() -> list[dict[str, Any]]:
                 "SELECT symbol, name, exchange, NULL, NULL, NULL, NULL, NULL, NULL, NULL"
                 " FROM index_master ORDER BY sort_order"
             ).fetchall()
-    return [{
-        "symbol": r[0], "name": r[1], "exchange": r[2],
-        "open": r[3], "high": r[4], "low": r[5], "close": r[6],
-        "yearHigh": r[7], "yearLow": r[8],
-        "asOf": str(r[9])[:10] if r[9] is not None else None,
-    } for r in rows]
+    return [
+        {
+            "symbol": r[0],
+            "name": r[1],
+            "exchange": r[2],
+            "open": r[3],
+            "high": r[4],
+            "low": r[5],
+            "close": r[6],
+            "yearHigh": r[7],
+            "yearLow": r[8],
+            "asOf": str(r[9])[:10] if r[9] is not None else None,
+        }
+        for r in rows
+    ]
 
 
 @app.get("/api/indices/{symbol}/chart.png")
@@ -184,8 +206,7 @@ def index_chart(symbol: str) -> FileResponse:
                 bars = _index_bars(con, row[0])
                 symbol = row[0]
     if not bars:
-        raise HTTPException(status_code=404,
-                            detail=f"no daily data synced for index '{symbol}'")
+        raise HTTPException(status_code=404, detail=f"no daily data synced for index '{symbol}'")
     out = chart_cache_dir() / f"index_{_sanitize(symbol)}.png"
     render_candles_png(bars, f"{symbol} — daily", str(out))
     return FileResponse(str(out), media_type="image/png")
@@ -199,16 +220,17 @@ def stock_chart(symbol: str, exchange: str = Query(default="NSE")) -> FileRespon
             bars = _stock_bars(con, symbol, None)
     if not bars:
         raise HTTPException(
-            status_code=404,
-            detail=f"no daily data synced for stock '{symbol}' ({exchange})")
+            status_code=404, detail=f"no daily data synced for stock '{symbol}' ({exchange})"
+        )
     out = chart_cache_dir() / f"stock_{_sanitize(exchange)}_{_sanitize(symbol)}.png"
     render_candles_png(bars, f"{symbol} ({exchange}) — daily", str(out))
     return FileResponse(str(out), media_type="image/png")
 
 
 @app.get("/api/search")
-def search(q: str = Query(default=""), limit: int = Query(default=10, ge=1, le=100)
-           ) -> list[dict[str, Any]]:
+def search(
+    q: str = Query(default=""), limit: int = Query(default=10, ge=1, le=100)
+) -> list[dict[str, Any]]:
     """Dictionary-method search: case-insensitive prefix matches first, then
     substring, then token matches, ranked; over the securities dictionary
     table, falling back to index_master names too."""
@@ -223,7 +245,7 @@ def search(q: str = Query(default=""), limit: int = Query(default=10, ge=1, le=1
             "SELECT symbol, name, exchange FROM index_master WHERE active"
         ).fetchall()
 
-    def rank(symbol: str, name: str) -> Optional[int]:
+    def rank(symbol: str, name: str) -> int | None:
         s, n = symbol.lower(), name.lower()
         if s.startswith(query) or n.startswith(query):
             return 0
@@ -240,8 +262,7 @@ def search(q: str = Query(default=""), limit: int = Query(default=10, ge=1, le=1
         if r is not None:
             scored.append((r, symbol, name, exchange))
     scored.sort(key=lambda t: (t[0], t[1]))
-    return [{"symbol": s, "name": n, "exchange": e}
-            for _, s, n, e in scored[:limit]]
+    return [{"symbol": s, "name": n, "exchange": e} for _, s, n, e in scored[:limit]]
 
 
 @app.get("/api/quotes")
@@ -275,13 +296,19 @@ def benchmarks() -> dict[str, Any]:
                     (series["key"],),
                 ).fetchall()
                 latest = rows[0][1] if rows else None
-                change = (round(rows[0][1] - rows[1][1], 4)
-                          if len(rows) > 1 else None)
+                change = round(rows[0][1] - rows[1][1], 4) if len(rows) > 1 else None
                 as_of = str(rows[0][0])[:10] if rows else None
-                series_out.append({"name": series["name"], "latest": latest,
-                                   "change": change, "asOf": as_of})
-            groups.append({"key": group["key"], "title": group["title"],
-                           "unit": group["unit"], "series": series_out})
+                series_out.append(
+                    {"name": series["name"], "latest": latest, "change": change, "asOf": as_of}
+                )
+            groups.append(
+                {
+                    "key": group["key"],
+                    "title": group["title"],
+                    "unit": group["unit"],
+                    "series": series_out,
+                }
+            )
     return {"groups": groups}
 
 
@@ -296,18 +323,16 @@ def benchmark_chart(key: str) -> FileResponse:
     with db() as con:
         for series in group["series"]:
             rows = con.execute(
-                "SELECT date, value FROM benchmark_observations"
-                " WHERE series_key = ? ORDER BY date", (series["key"],)
+                "SELECT date, value FROM benchmark_observations WHERE series_key = ? ORDER BY date",
+                (series["key"],),
             ).fetchall()
             if rows:
                 series_points.append([(str(r[0])[:10], r[1]) for r in rows])
                 labels.append(series["name"])
     if not series_points:
-        raise HTTPException(status_code=404,
-                            detail=f"no observations synced for benchmark '{key}'")
+        raise HTTPException(status_code=404, detail=f"no observations synced for benchmark '{key}'")
     out = chart_cache_dir() / f"benchmark_{_sanitize(key)}.png"
-    render_line_png(series_points, group["title"], group["unit"], str(out),
-                    series_labels=labels)
+    render_line_png(series_points, group["title"], group["unit"], str(out), series_labels=labels)
     return FileResponse(str(out), media_type="image/png")
 
 
@@ -331,13 +356,21 @@ def macro() -> list[dict[str, Any]]:
         ).fetchall()
     out = []
     for key, title, category, unit, frequency, source, source_url, latest, period, prev in rows:
-        change = (round(latest - prev, 4)
-                  if latest is not None and prev is not None else None)
-        out.append({
-            "key": key, "title": title, "category": category, "unit": unit,
-            "frequency": frequency, "source": source, "sourceUrl": source_url,
-            "latest": latest, "period": period, "change": change,
-        })
+        change = round(latest - prev, 4) if latest is not None and prev is not None else None
+        out.append(
+            {
+                "key": key,
+                "title": title,
+                "category": category,
+                "unit": unit,
+                "frequency": frequency,
+                "source": source,
+                "sourceUrl": source_url,
+                "latest": latest,
+                "period": period,
+                "change": change,
+            }
+        )
     return out
 
 
