@@ -8,9 +8,14 @@ Electron shell (electron/)                — secure desktop wrapper, NSIS insta
         │  HTTP/JSON + PNG over 127.0.0.1:8787
         ▼
 FastAPI sidecar (backend/server.py)       — local-only API, never fabricates numbers
-  ├─ backend/db.py + db_config.json       — DuckDB, config-driven bootstrap
+  ├─ backend/db.py + db_config.json       — DuckDB, config-driven bootstrap (runs migrations)
+  ├─ backend/migrate.py + migrations/     — versioned schema (schema_migrations, NNNN_*.sql)
+  ├─ backend/validation.py                — write-path OHLCV validation → data_rejects quarantine
+  ├─ backend/calendar.py + data/          — NSE trading calendar (seeded 2025–2026 window)
+  ├─ backend/ingestion.py                 — ingestion_runs audit (asOf / staleness reporting)
+  ├─ backend/backup.py                    — parquet snapshots, retention 14 daily + 12 monthly
   ├─ backend/openalgo_client.py           — market data client (provider swap → Kite in P3)
-  ├─ backend/fetch_daily / fetch_indices  — checkpointed, alphabetical daily pulls
+  ├─ backend/fetch_daily / fetch_indices  — checkpointed, alphabetical, validated daily pulls
   ├─ backend/charts.py                    — matplotlib (Agg) PNG chart renderers
   └─ backend/settings.py / logging_config.py — validated config + structured logs
 
@@ -23,12 +28,38 @@ archive/                                  — legacy sources, reference only, ne
 ## Data flow (daily)
 
 1. `python -m backend.fetch_indices` / `fetch_daily` pull daily bars from the
-   configured market-data provider, in strict alphabetical order, writing
-   upserts + `fetch_checkpoint` rows into DuckDB (`data/bazzar.duckdb`).
-2. Macro/benchmark observations land in `macro_observations` /
+   configured market-data provider, in strict alphabetical order. Every batch
+   passes `backend/validation.py`: valid rows are upserted idempotently,
+   invalid rows are quarantined in `data_rejects` with a reason (never
+   silently dropped, never crashing the run); `fetch_checkpoint` records the
+   last completed symbol so an interrupted run resumes at the next one. Each
+   run is audited in `ingestion_runs` (rows written/rejected, status, error).
+2. Dates are checked against the `trading_calendar` (NSE, seeded from
+   `backend/data/nse_calendar.csv`; refresh annually when NSE publishes the
+   next calendar). Outside the seeded coverage window the calendar check is
+   skipped rather than guessed.
+3. Macro/benchmark observations land in `macro_observations` /
    `benchmark_observations` (registry: `backend/db_config.json`).
-3. The renderer calls the FastAPI sidecar for JSON lists and PNG charts.
+4. The renderer calls the FastAPI sidecar for JSON lists and PNG charts.
    Unsynced data returns `null` fields — the UI shows "awaiting data sync".
+   `/api/meta/ingestion` reports per-job freshness (`data_as_of`) and
+   `/api/meta/rejects` exposes the quarantine.
+5. `python -m backend.backup create` snapshots the whole database to
+   timestamped parquet under `data/backups/` (retention: last 14 daily +
+   12 monthly), `restore` imports a snapshot into a fresh file.
+
+## Schema management
+
+- `backend/migrations/NNNN_*.sql` files are applied in order at startup by
+  `backend/migrate.py` and recorded in `schema_migrations`.
+- `0001_init.sql` is the generated baseline of the `db_config.json` domain
+  tables; `0002_ops_tables.sql` adds the operational tables (`data_rejects`,
+  `ingestion_runs`, `trading_calendar`) which use sequences/defaults the
+  config DDL does not express.
+- Rule: never edit an applied migration — add a new `NNNN_*.sql`. When a
+  domain table changes in `db_config.json`, pair it with a migration.
+- `initialize_database()` = migrate to latest → config safety-net sync →
+  seed reference tables and the trading calendar. Idempotent on every boot.
 
 ## Hard rules (from SPEC.md, extended)
 
@@ -56,5 +87,5 @@ archive/                                  — legacy sources, reference only, ne
 
 ## Roadmap status
 
-v2.0 execution follows `BAZZAR_ROADMAP.md` (P0 repo hygiene + P1 tooling done
-in 1.3.0; P2 data-layer hardening and P3 Kite Connect migration next).
+v2.0 execution follows `BAZZAR_ROADMAP.md` (P0 repo hygiene + P1 tooling in
+1.3.0; P2 data-layer hardening in 1.4.0; P3 Kite Connect migration next).
