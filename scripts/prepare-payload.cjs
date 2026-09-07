@@ -42,4 +42,6 @@ for (const entry of fs.readdirSync(projectDir)) {
   copyRecursive(path.join(projectDir, entry), path.join(payloadDir, entry));
 }
 
-console.log(`Repository payload staged at ${path.relative(projectDir, payloadDir)} (${fileCount} files)`);
+console.log(
+  `Repository payload staged at ${path.relative(projectDir, payloadDir)} (${fileCount} files)`
+);

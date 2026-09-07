@@ -67,8 +67,12 @@ function getRepositoryInfo() {
 
 // Compare dotted numeric versions: returns -1, 0 or 1.
 function compareVersions(a, b) {
-  const pa = String(a || '').split('.').map((part) => parseInt(part, 10) || 0);
-  const pb = String(b || '').split('.').map((part) => parseInt(part, 10) || 0);
+  const pa = String(a || '')
+    .split('.')
+    .map((part) => parseInt(part, 10) || 0);
+  const pb = String(b || '')
+    .split('.')
+    .map((part) => parseInt(part, 10) || 0);
   const len = Math.max(pa.length, pb.length);
   for (let i = 0; i < len; i += 1) {
     const x = pa[i] || 0;
@@ -89,41 +93,46 @@ function fetchUrl(url, { timeoutMs = 20000, maxBytes = 10 * 1024 * 1024, redirec
       reject(new Error(`Invalid URL: ${url}`));
       return;
     }
-    const transport = parsed.protocol === 'https:' ? https : parsed.protocol === 'http:' ? http : null;
+    const transport =
+      parsed.protocol === 'https:' ? https : parsed.protocol === 'http:' ? http : null;
     if (!transport) {
       reject(new Error(`Unsupported protocol: ${parsed.protocol}`));
       return;
     }
-    const req = transport.get(parsed, { headers: { 'user-agent': 'bazzar-terminal/1.1.0' } }, (res) => {
-      const status = res.statusCode || 0;
-      if (status >= 300 && status < 400 && res.headers.location) {
-        res.resume();
-        if (redirects <= 0) {
-          reject(new Error('Too many redirects'));
+    const req = transport.get(
+      parsed,
+      { headers: { 'user-agent': 'bazzar-terminal/1.1.0' } },
+      (res) => {
+        const status = res.statusCode || 0;
+        if (status >= 300 && status < 400 && res.headers.location) {
+          res.resume();
+          if (redirects <= 0) {
+            reject(new Error('Too many redirects'));
+            return;
+          }
+          const next = new URL(res.headers.location, parsed).toString();
+          fetchUrl(next, { timeoutMs, maxBytes, redirects: redirects - 1 }).then(resolve, reject);
           return;
         }
-        const next = new URL(res.headers.location, parsed).toString();
-        fetchUrl(next, { timeoutMs, maxBytes, redirects: redirects - 1 }).then(resolve, reject);
-        return;
-      }
-      if (status < 200 || status >= 300) {
-        res.resume();
-        reject(new Error(`Request failed with HTTP ${status}`));
-        return;
-      }
-      const chunks = [];
-      let received = 0;
-      res.on('data', (chunk) => {
-        received += chunk.length;
-        if (received > maxBytes) {
-          req.destroy(new Error(`Response exceeded ${maxBytes} bytes`));
+        if (status < 200 || status >= 300) {
+          res.resume();
+          reject(new Error(`Request failed with HTTP ${status}`));
           return;
         }
-        chunks.push(chunk);
-      });
-      res.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
-      res.on('error', reject);
-    });
+        const chunks = [];
+        let received = 0;
+        res.on('data', (chunk) => {
+          received += chunk.length;
+          if (received > maxBytes) {
+            req.destroy(new Error(`Response exceeded ${maxBytes} bytes`));
+            return;
+          }
+          chunks.push(chunk);
+        });
+        res.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+        res.on('error', reject);
+      }
+    );
     req.setTimeout(timeoutMs, () => req.destroy(new Error('Request timed out')));
     req.on('error', reject);
   });
@@ -206,11 +215,17 @@ function normalizeCsvRows(text) {
   };
   if (col.symbol === -1 || col.close === -1) {
     // No usable header: cannot normalize.
-    return { rows: [], skipped: Math.max(0, records.length - 1), error: 'missing required columns' };
+    return {
+      rows: [],
+      skipped: Math.max(0, records.length - 1),
+      error: 'missing required columns',
+    };
   }
 
   const num = (v) => {
-    const cleaned = String(v || '').replace(/[,$]/g, '').trim();
+    const cleaned = String(v || '')
+      .replace(/[,$]/g, '')
+      .trim();
     if (cleaned === '') return null;
     const n = Number(cleaned);
     return Number.isFinite(n) ? n : null;
@@ -219,7 +234,9 @@ function normalizeCsvRows(text) {
   const rows = [];
   let skipped = 0;
   for (const rec of records.slice(1)) {
-    const symbol = String(rec[col.symbol] || '').trim().toUpperCase();
+    const symbol = String(rec[col.symbol] || '')
+      .trim()
+      .toUpperCase();
     const close = num(rec[col.close]);
     if (!symbol || close === null) {
       skipped += 1;
@@ -279,7 +296,9 @@ function normalizeJsonRows(text) {
       skipped += 1;
       continue;
     }
-    const symbol = String(pick(item, 'symbol', 'ticker') || '').trim().toUpperCase();
+    const symbol = String(pick(item, 'symbol', 'ticker') || '')
+      .trim()
+      .toUpperCase();
     const close = num(pick(item, 'close', 'adj close', 'adjclose', 'last'));
     if (!symbol || close === null) {
       skipped += 1;
@@ -354,7 +373,14 @@ function analyzeRows(rows) {
 
 const SCRAPER_OUTPUT_NAME = 'daily_ohlcv.csv';
 const SCRAPER_SAMPLE_SYMBOLS = [
-  'RELIANCE', 'TCS', 'INFY', 'HDFCBANK', 'ICICIBANK', 'SBIN', 'TATAMOTORS', 'ITC',
+  'RELIANCE',
+  'TCS',
+  'INFY',
+  'HDFCBANK',
+  'ICICIBANK',
+  'SBIN',
+  'TATAMOTORS',
+  'ITC',
 ];
 const SCRAPER_SAMPLE_DAYS = 60;
 // Flush to disk in chunks so pause/cancel remain responsive mid-scrape.
@@ -507,7 +533,11 @@ function analyzeScraperOutput(csvPath) {
     const resolved = path.resolve(csvPath);
     const userDataDir = path.resolve(app.getPath('userData'));
     if (!resolved.startsWith(userDataDir + path.sep)) {
-      return { ok: false, error: 'Analysis is restricted to files under the app data directory', path: resolved };
+      return {
+        ok: false,
+        error: 'Analysis is restricted to files under the app data directory',
+        path: resolved,
+      };
     }
     target = resolved;
   }
@@ -628,8 +658,7 @@ function startBackendSidecar() {
   if (process.env.BAZZAR_BACKEND === '0' || backendProcess) return;
   const cwd = backendWorkingDir();
   if (!cwd) return;
-  const python =
-    process.env.BAZZAR_PYTHON || (process.platform === 'win32' ? 'python' : 'python3');
+  const python = process.env.BAZZAR_PYTHON || (process.platform === 'win32' ? 'python' : 'python3');
   try {
     backendProcess = spawn(python, ['-m', 'backend.server'], {
       cwd,
