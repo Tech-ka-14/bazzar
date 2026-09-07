@@ -1,0 +1,8 @@
+node_modules
+dist
+release
+build
+coverage
+package-lock.json
+*.md
+archive

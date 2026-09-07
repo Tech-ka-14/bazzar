@@ -1,0 +1,12 @@
+-r requirements.txt
+
+# Testing
+pytest>=8.2
+pytest-cov>=5.0
+
+# Lint / format / types
+ruff>=0.6
+mypy>=1.11
+
+# Git hooks
+pre-commit>=3.8
