@@ -96,8 +96,10 @@ def run(start: str, end: str) -> int:
         return 0
 
     client = OpenAlgoClient()
-    print(f"Fetching daily OHLC for {len(todo)} indices ({start} -> {end}),"
-          f" alphabetical via sort_order, interval 'D'.")
+    print(
+        f"Fetching daily OHLC for {len(todo)} indices ({start} -> {end}),"
+        f" alphabetical via sort_order, interval 'D'."
+    )
     total = 0
     for symbol, exchange in todo:
         con = get_connection()
@@ -115,8 +117,7 @@ def run(start: str, end: str) -> int:
         ensure_snapshot_view(con)
     finally:
         con.close()
-    print(f"Done. {total} bars upserted across {len(todo)} indices;"
-          " index_snapshot view refreshed.")
+    print(f"Done. {total} bars upserted across {len(todo)} indices; index_snapshot view refreshed.")
     return 0
 
 
@@ -124,13 +125,15 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="python3 -m backend.fetch_indices",
         description="Fetch daily OHLC for every index in index_master"
-                    " (alphabetical, checkpointed, daily interval only) and"
-                    " refresh the index_snapshot 52-week high/low view.",
+        " (alphabetical, checkpointed, daily interval only) and"
+        " refresh the index_snapshot 52-week high/low view.",
     )
-    parser.add_argument("--start", default=default_start(),
-                        help="start date YYYY-MM-DD (default: 10 years ago)")
-    parser.add_argument("--end", default=dt.date.today().isoformat(),
-                        help="end date YYYY-MM-DD (default: today)")
+    parser.add_argument(
+        "--start", default=default_start(), help="start date YYYY-MM-DD (default: 10 years ago)"
+    )
+    parser.add_argument(
+        "--end", default=dt.date.today().isoformat(), help="end date YYYY-MM-DD (default: today)"
+    )
     return parser
 
 

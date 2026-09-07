@@ -23,7 +23,7 @@ import argparse
 import csv
 import sys
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from .db import get_connection, initialize_database, load_config
 
@@ -97,19 +97,29 @@ def latest_observations(con=None) -> list[dict[str, Any]]:
             ORDER BY s.category, s.key
             """
         ).fetchall()
-        cols = ["key", "title", "category", "unit", "frequency", "source",
-                "source_url", "latest", "period", "previous"]
-        return [dict(zip(cols, r)) for r in rows]
+        cols = [
+            "key",
+            "title",
+            "category",
+            "unit",
+            "frequency",
+            "source",
+            "source_url",
+            "latest",
+            "period",
+            "previous",
+        ]
+        return [dict(zip(cols, r, strict=True)) for r in rows]
     finally:
         if own:
             con.close()
 
 
-def main(argv: Optional[list[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="python3 -m backend.macro",
         description="Macro observation import helpers (no scraping — data is"
-                    " entered/imported from the official sources in the registry).",
+        " entered/imported from the official sources in the registry).",
     )
     sub = parser.add_subparsers(dest="command", required=True)
     p_import = sub.add_parser("import", help="import a CSV (series_key,period,value)")

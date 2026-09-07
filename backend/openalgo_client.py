@@ -20,7 +20,7 @@ import os
 import threading
 import time
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import requests
 
@@ -35,7 +35,7 @@ class CredentialsNotConfigured(RuntimeError):
     """Raised when the OpenAlgo API key is missing from env/.env."""
 
 
-def load_dotenv(path: Optional[str] = None) -> dict[str, str]:
+def load_dotenv(path: str | None = None) -> dict[str, str]:
     """Minimal .env parser: KEY=VALUE lines, '#' comments, optional quotes.
 
     Does not override variables already present in os.environ. Returns the
@@ -86,14 +86,15 @@ class OpenAlgoClient:
 
     def __init__(
         self,
-        base_url: Optional[str] = None,
-        api_key: Optional[str] = None,
-        env_path: Optional[str] = None,
-        requests_per_minute: Optional[int] = None,
+        base_url: str | None = None,
+        api_key: str | None = None,
+        env_path: str | None = None,
+        requests_per_minute: int | None = None,
     ):
         load_dotenv(env_path)
-        self.base_url = (base_url or os.environ.get("OPENALGO_BASE_URL")
-                         or DEFAULT_BASE_URL).rstrip("/")
+        self.base_url = (
+            base_url or os.environ.get("OPENALGO_BASE_URL") or DEFAULT_BASE_URL
+        ).rstrip("/")
         self.api_key = api_key or os.environ.get("OPENALGO_API_KEY")
         self.broker_api_key = os.environ.get("BROKER_API_KEY")
         self.broker_api_secret = os.environ.get("BROKER_API_SECRET")
@@ -118,13 +119,16 @@ class OpenAlgoClient:
 
     def history(self, symbol: str, exchange: str, start_date: str, end_date: str) -> Any:
         """Daily OHLCV history. `interval` is always "D" (daily only)."""
-        return self._post("/api/v1/history", {
-            "symbol": symbol,
-            "exchange": exchange,
-            "interval": INTERVAL,
-            "start_date": start_date,
-            "end_date": end_date,
-        })
+        return self._post(
+            "/api/v1/history",
+            {
+                "symbol": symbol,
+                "exchange": exchange,
+                "interval": INTERVAL,
+                "start_date": start_date,
+                "end_date": end_date,
+            },
+        )
 
     def quotes(self, symbol: str, exchange: str) -> Any:
         return self._post("/api/v1/quotes", {"symbol": symbol, "exchange": exchange})
@@ -140,7 +144,7 @@ def _to_date_str(value: Any) -> str:
     """Normalise an epoch (s/ms) or ISO-ish timestamp to YYYY-MM-DD."""
     if isinstance(value, (int, float)):
         secs = value / 1000.0 if value > 1e12 else float(value)
-        return dt.datetime.fromtimestamp(secs, tz=dt.timezone.utc).date().isoformat()
+        return dt.datetime.fromtimestamp(secs, tz=dt.UTC).date().isoformat()
     text = str(value).strip()
     return text[:10]
 
@@ -167,7 +171,7 @@ def normalize_history(payload: Any) -> list[dict[str, Any]]:
     elif isinstance(data, dict):  # columnar dict of lists
         keys = [str(k).lower() for k in data.keys()]
         values = [list(v) for v in data.values()]
-        rows = [list(r) for r in zip(*values)] if values else []
+        rows = [list(r) for r in zip(*values, strict=False)] if values else []
     elif isinstance(data, list):
         if data and isinstance(data[0], dict):
             keys = [str(k).lower() for k in data[0].keys()]
@@ -177,7 +181,7 @@ def normalize_history(payload: Any) -> list[dict[str, Any]]:
     else:
         return []
 
-    def idx(*names: str) -> Optional[int]:
+    def idx(*names: str) -> int | None:
         for n in names:
             if n in keys:
                 return keys.index(n)
@@ -193,15 +197,17 @@ def normalize_history(payload: Any) -> list[dict[str, Any]]:
     bars = []
     for r in rows:
         try:
-            bars.append({
-                "date": _to_date_str(r[i_time]),
-                "open": float(r[i_open]) if i_open is not None else None,
-                "high": float(r[i_high]) if i_high is not None else None,
-                "low": float(r[i_low]) if i_low is not None else None,
-                "close": float(r[i_close]),
-                "volume": int(r[i_vol]) if i_vol is not None and r[i_vol] is not None else None,
-            })
+            bars.append(
+                {
+                    "date": _to_date_str(r[i_time]),
+                    "open": float(r[i_open]) if i_open is not None else None,
+                    "high": float(r[i_high]) if i_high is not None else None,
+                    "low": float(r[i_low]) if i_low is not None else None,
+                    "close": float(r[i_close]),
+                    "volume": int(r[i_vol]) if i_vol is not None and r[i_vol] is not None else None,
+                }
+            )
         except (TypeError, ValueError):
             continue
-    bars.sort(key=lambda b: b["date"])
+    bars.sort(key=lambda b: str(b["date"]))
     return bars
