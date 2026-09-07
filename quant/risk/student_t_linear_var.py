@@ -39,7 +39,7 @@ def calculate_student_t_var(
 # Example IV.2.18 & IV.2.19: Comparison of Normal and Student t VaR (FTSE 100)
 # Assuming typical daily volatility of ~1.08% to match the text's 1-day 1% VaR outputs
 daily_vol = 0.0108
-daily_mu = 0.0
+ daily_mu = 0.0
 degrees_of_freedom_mle = 4.14
 
 # Compare at 0.1%, 1%, and 10% significance levels
