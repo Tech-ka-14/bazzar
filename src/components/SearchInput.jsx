@@ -6,7 +6,12 @@ import { apiGet } from '../api.js';
 // from GET /api/search and shown in a dropdown with full keyboard navigation
 // (ArrowUp/ArrowDown/Enter/Escape). Selecting a suggestion calls onSelect(item)
 // with { symbol, name, exchange }.
-export default function SearchInput({ onSelect, placeholder = 'Search stocks or indices...', className = '', limit = 10 }) {
+export default function SearchInput({
+  onSelect,
+  placeholder = 'Search stocks or indices...',
+  className = '',
+  limit = 10,
+}) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [isOpen, setIsOpen] = useState(false);
@@ -96,22 +101,25 @@ export default function SearchInput({ onSelect, placeholder = 'Search stocks or 
         value={query}
         placeholder={placeholder}
         onChange={(e) => setQuery(e.target.value)}
-        onFocus={() => { if (results.length > 0) setIsOpen(true); }}
+        onFocus={() => {
+          if (results.length > 0) setIsOpen(true);
+        }}
         onKeyDown={handleKeyDown}
         className="w-full bg-gray-800 text-white p-2 rounded border border-gray-700 focus:border-yellow-500 outline-none"
       />
       {isOpen && (
         <ul className="absolute z-30 left-0 right-0 mt-1 bg-gray-900 border border-gray-700 rounded shadow-lg max-h-64 overflow-y-auto">
-          {isLoading && (
-            <li className="px-3 py-2 text-sm text-gray-500">Searching...</li>
-          )}
+          {isLoading && <li className="px-3 py-2 text-sm text-gray-500">Searching...</li>}
           {!isLoading && results.length === 0 && (
             <li className="px-3 py-2 text-sm text-gray-500">No matches found</li>
           )}
           {results.map((item, i) => (
             <li
               key={`${item.symbol}-${item.exchange || ''}`}
-              onMouseDown={(e) => { e.preventDefault(); pick(item); }}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                pick(item);
+              }}
               onMouseEnter={() => setHighlight(i)}
               className={`px-3 py-2 cursor-pointer flex items-center justify-between gap-2 ${i === highlight ? 'bg-gray-800 border-l-2 border-yellow-500' : 'border-l-2 border-transparent'}`}
             >
