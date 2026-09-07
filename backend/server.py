@@ -25,7 +25,7 @@ from .charts import chart_cache_dir, render_candles_png, render_line_png
 from .db import get_connection, get_db_path, initialize_database, load_config
 from .fetch_indices import ensure_snapshot_view
 
-VERSION = "1.2.0"
+VERSION = "1.4.0"
 
 app = FastAPI(title="Bazzar Terminal Data API", version=VERSION)
 app.add_middleware(
@@ -135,6 +135,41 @@ def health() -> dict[str, Any]:
         except Exception:
             ok = False
     return {"ok": ok, "db": str(db_path), "version": VERSION}
+
+
+@app.get("/api/meta/ingestion")
+def meta_ingestion() -> dict[str, Any]:
+    """Ingestion audit: per-job freshness (asOf) + recent runs (P2).
+
+    Never fabricated: jobs that have never run simply do not appear, and
+    data_as_of is null until real data has been synced.
+    """
+    from .ingestion import data_freshness, latest_runs
+
+    with db() as con:
+        return {"freshness": data_freshness(con), "recent_runs": latest_runs(con, limit=20)}
+
+
+@app.get("/api/meta/rejects")
+def meta_rejects(limit: int = Query(default=100, ge=1, le=1000)) -> list[dict[str, Any]]:
+    """Rows quarantined by write validation (P2), newest first."""
+    with db() as con:
+        rows = con.execute(
+            "SELECT id, job, table_name, payload, reason, rejected_at"
+            " FROM data_rejects ORDER BY id DESC LIMIT ?",
+            (limit,),
+        ).fetchall()
+    return [
+        {
+            "id": r[0],
+            "job": r[1],
+            "table": r[2],
+            "payload": r[3],
+            "reason": r[4],
+            "rejected_at": str(r[5]),
+        }
+        for r in rows
+    ]
 
 
 @app.get("/api/home/indices")
