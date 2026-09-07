@@ -141,16 +141,33 @@ electron/update-manifest.json  Packaged update-notification manifest
 installer/icon.base64    Text-encoded app icon (decoded to build/icon.ico)
 scripts/prepare-icon.cjs Decodes the app icon before packaging
 scripts/prepare-payload.cjs  Stages the repository payload into build/repository
-src/                   Repaired React app (theme, components, mock data)
+src/                   React app (theme, components, API client)
+backend/               FastAPI sidecar + DuckDB data layer + fetchers + charts
+quant/                 180-module quant analytics library (risk, copulas,
+                       timeseries, portfolio, stats, pricing) — pure functions
+archive/               Legacy JSX drafts + Go scraper prototype (reference only)
+tests/                 pytest suite (compile gate, backend smoke tests)
 build/repository/      Staged repository payload (generated, git-ignored)
 dist/                  Vite production build output
 release/               electron-builder installer output
-*.jsx (repo root)      Original component sources, kept untouched
-*.py / *.go            Original Python/Go sources, kept untouched
-requirements.txt       Python third-party dependencies
-go.mod                 Go scraper dependency manifest (source-only)
-SPEC.md                Product/installer specification
+requirements.txt       Python runtime dependencies
+requirements-dev.txt   Python dev tooling (pytest, ruff, mypy, pre-commit)
+pyproject.toml         Python project + ruff/mypy/pytest configuration
+SPEC.md                Product/installer/data-platform specification
+ARCHITECTURE.md        System architecture and hard rules
+CHANGELOG.md           Release history
 ```
+
+## Quality gates (since 1.3.0)
+
+```bash
+make setup     # pip install -r requirements-dev.txt && npm install && pre-commit install
+make check     # ruff + mypy + pytest + eslint + prettier + vitest + build (= CI)
+```
+
+CI runs on every push/PR: Python gate (ruff, mypy, pytest), Node gate
+(eslint, prettier, vitest, vite build), and a gitleaks secret scan.
+Dependabot watches pip, npm, and GitHub Actions.
 
 ## Data platform (v1.2.0)
 

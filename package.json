@@ -1,7 +1,7 @@
 {
   "name": "bazzar-terminal",
   "productName": "Bazzar Terminal",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "Bazzar Terminal - Windows desktop financial terminal built from the Bazzar repository",
   "author": "Bazzar",
   "license": "MIT",
@@ -18,7 +18,13 @@
     "dist": "npm run build && npm run prepare:icon && npm run prepare:payload && electron-builder",
     "dist:win": "npm run build && npm run prepare:icon && npm run prepare:payload && electron-builder --win --x64",
     "dist:win:dir": "npm run build && npm run prepare:icon && npm run prepare:payload && electron-builder --win --x64 --dir -c.win.signAndEditExecutable=false",
-    "dist:win:nsis": "npm run dist:win:dir && node scripts/build-nsis.cjs"
+    "dist:win:nsis": "npm run dist:win:dir && node scripts/build-nsis.cjs",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "check": "npm run lint && npm run format:check && npm run test && npm run build"
   },
   "dependencies": {
     "lucide-react": "^0.454.0",
@@ -32,7 +38,13 @@
     "electron-builder": "^25.1.8",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.15",
-    "vite": "^5.4.11"
+    "vite": "^5.4.11",
+    "@eslint/js": "^9.13.0",
+    "eslint": "^9.13.0",
+    "eslint-plugin-react": "^7.37.2",
+    "globals": "^15.11.0",
+    "prettier": "^3.3.3",
+    "vitest": "^2.1.4"
   },
   "build": {
     "appId": "com.bazzar.terminal",
