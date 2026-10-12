@@ -36,7 +36,16 @@ class Settings(BaseSettings):
     bazzar_api_port: int = Field(default=8787, ge=1, le=65535)
     bazzar_api_host: str = Field(default="127.0.0.1")
 
-    # --- market data provider (OpenAlgo today; Kite lands in P3) ----------
+    # --- market data provider (P3: kite is primary; openalgo fallback) -----
+    market_data_provider: str = Field(
+        default="openalgo",
+        description="Active provider: kite | openalgo | nse_bhavcopy.",
+    )
+    kite_api_key: str = Field(
+        default="",
+        description="Kite Connect API key (non-secret). The API secret and the "
+        "daily access token live in the OS keyring ONLY — never here.",
+    )
     openalgo_base_url: str = Field(default="http://127.0.0.1:5000")
     openalgo_api_key: str = Field(default="")
     broker_api_key: str = Field(default="")

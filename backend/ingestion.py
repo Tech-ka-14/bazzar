@@ -29,17 +29,23 @@ logger = get_logger("ingestion")
 
 @dataclass
 class RunHandle:
-    """Mutable counters a job updates while running."""
+    """Mutable counters a job updates while running.
+
+    Set ``error`` to record a non-fatal problem (e.g. per-symbol failures in
+    fetch_daily): the run then finishes with status "partial" instead of
+    "success", and the error text lands in ingestion_runs.error.
+    """
 
     run_id: int
     job: str
     rows_written: int = 0
     rows_rejected: int = 0
+    error: str | None = None
 
 
 @contextmanager
 def ingestion_run(con: duckdb.DuckDBPyConnection, job: str) -> Iterator[RunHandle]:
-    """Record one ingestion job run; status is success/failed on exit."""
+    """Record one ingestion job run; status is success/partial/failed on exit."""
     started = dt.datetime.now(dt.UTC).replace(tzinfo=None)
     row = con.execute(
         "INSERT INTO ingestion_runs (job, started_at, status) VALUES (?, ?, 'running')"
@@ -59,10 +65,17 @@ def ingestion_run(con: duckdb.DuckDBPyConnection, job: str) -> Iterator[RunHandl
         logger.error("ingestion run failed", job=job, run_id=handle.run_id, error=str(exc))
         raise
     else:
+        status = "partial" if handle.error else "success"
         con.execute(
             "UPDATE ingestion_runs SET finished_at = now(), rows_written = ?,"
-            " rows_rejected = ?, status = 'success' WHERE run_id = ?",
-            (handle.rows_written, handle.rows_rejected, handle.run_id),
+            " rows_rejected = ?, status = ?, error = ? WHERE run_id = ?",
+            (
+                handle.rows_written,
+                handle.rows_rejected,
+                status,
+                (handle.error or "")[:1000] or None,
+                handle.run_id,
+            ),
         )
         logger.info(
             "ingestion run finished",
@@ -70,6 +83,7 @@ def ingestion_run(con: duckdb.DuckDBPyConnection, job: str) -> Iterator[RunHandl
             run_id=handle.run_id,
             rows_written=handle.rows_written,
             rows_rejected=handle.rows_rejected,
+            status=status,
         )
 
 

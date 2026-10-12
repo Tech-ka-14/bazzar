@@ -25,7 +25,7 @@ from .charts import chart_cache_dir, render_candles_png, render_line_png
 from .db import get_connection, get_db_path, initialize_database, load_config
 from .fetch_indices import ensure_snapshot_view
 
-VERSION = "1.4.0"
+VERSION = "1.5.0"
 
 app = FastAPI(title="Bazzar Terminal Data API", version=VERSION)
 app.add_middleware(
@@ -122,6 +122,61 @@ def _sanitize(name: str) -> str:
 
 
 # --- endpoints ---------------------------------------------------------------
+
+
+@app.get("/api/auth/kite/login-url")
+def kite_login_url() -> dict[str, Any]:
+    """The Zerodha redirect-login URL for the configured KITE_API_KEY (P3)."""
+    from .providers.kite import login_url
+    from .settings import get_settings
+
+    api_key = get_settings().kite_api_key
+    if not api_key:
+        raise HTTPException(
+            status_code=503,
+            detail="KITE_API_KEY is not configured — set it in .env first.",
+        )
+    return {"url": login_url(api_key)}
+
+
+@app.get("/api/auth/kite/callback")
+def kite_callback(request_token: str = Query(default="")) -> dict[str, Any]:
+    """Kite redirect target: exchanges request_token for a session (keyring)."""
+    from . import kite_auth
+    from .providers.base import ProviderError
+    from .settings import get_settings
+
+    if not request_token:
+        raise HTTPException(status_code=400, detail="missing request_token")
+    api_key = get_settings().kite_api_key
+    if not api_key:
+        raise HTTPException(
+            status_code=503,
+            detail="KITE_API_KEY is not configured — set it in .env first.",
+        )
+    try:
+        meta = kite_auth.exchange_request_token(api_key, request_token)
+    except ProviderError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"status": "connected", **meta}
+
+
+@app.get("/api/auth/kite/status")
+def kite_status() -> dict[str, Any]:
+    """Non-secret Kite auth state for the UI (tokens never leave the keyring)."""
+    from . import kite_auth
+    from .settings import get_settings
+
+    return kite_auth.auth_status(get_settings().kite_api_key)
+
+
+@app.post("/api/auth/kite/disconnect")
+def kite_disconnect() -> dict[str, Any]:
+    """Clear the Kite session from the keyring (the API secret is kept)."""
+    from . import kite_auth
+
+    kite_auth.clear_session()
+    return {"status": "disconnected"}
 
 
 @app.get("/api/health")

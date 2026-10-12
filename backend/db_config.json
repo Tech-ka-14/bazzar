@@ -28,6 +28,18 @@
         {
           "name": "active",
           "type": "BOOLEAN"
+        },
+        {
+          "name": "instrument_token",
+          "type": "BIGINT"
+        },
+        {
+          "name": "lot_size",
+          "type": "INTEGER"
+        },
+        {
+          "name": "tick_size",
+          "type": "DOUBLE"
         }
       ],
       "primary_key": ["symbol", "exchange"]

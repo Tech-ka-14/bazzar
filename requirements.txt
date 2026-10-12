@@ -17,3 +17,7 @@ pydantic>=2.7
 pydantic-settings>=2.3
 structlog>=24.1
 tenacity>=8.3
+
+# Market-data providers (P3)
+kiteconnect>=5.0
+keyring>=25.0
