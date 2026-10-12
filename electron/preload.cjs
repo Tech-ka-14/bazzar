@@ -8,6 +8,11 @@ contextBridge.exposeInMainWorld('bazzar', {
   // Returns { name, version, electron, chrome, node, platform, arch, repository }.
   getAppInfo: () => ipcRenderer.invoke('app:get-info'),
 
+  // --- Sidecar API auth (P5) ---
+  // Per-launch bearer token generated in the main process; the renderer
+  // attaches it as `Authorization: Bearer <token>` on every API request.
+  getApiToken: () => ipcRenderer.invoke('get-api-token'),
+
   // --- Scraper test-bench ---
   // start({ mode: 'sample' | 'url', url? }) -> status snapshot.
   scraperStart: (options) => ipcRenderer.invoke('scraper:start', options),

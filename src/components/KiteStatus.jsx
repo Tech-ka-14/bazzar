@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { apiGet } from '../api.js';
 
-// Kite Connect status pill (P3). Polls the sidecar's /api/auth/kite/status
+// Kite Connect status pill (P3). Polls the sidecar's /api/v1/auth/kite/status
 // every 30s and renders one of:
 //   * "Kite: API offline"      — sidecar unreachable
 //   * "Kite: not configured"   — no KITE_API_KEY in .env (grey)
@@ -8,16 +9,13 @@ import React, { useCallback, useEffect, useState } from 'react';
 //   * "● Kite: <user>"         — authenticated (green; click to reconnect)
 // The button asks the API for the login URL, then opens it in the system
 // browser via the Electron shell bridge (window.open fallback in dev).
-
-const API = 'http://127.0.0.1:8787';
-
+// Goes through apiGet so the P5 bearer token is attached automatically.
 export default function KiteStatus() {
   const [status, setStatus] = useState(null);
   const [offline, setOffline] = useState(false);
 
   const refresh = useCallback(() => {
-    fetch(`${API}/api/auth/kite/status`)
-      .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`))))
+    apiGet('/api/v1/auth/kite/status')
       .then((data) => {
         setStatus(data);
         setOffline(false);
@@ -32,8 +30,7 @@ export default function KiteStatus() {
   }, [refresh]);
 
   const connect = useCallback(() => {
-    fetch(`${API}/api/auth/kite/login-url`)
-      .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`))))
+    apiGet('/api/v1/auth/kite/login-url')
       .then(({ url }) => {
         if (window.bazzar && typeof window.bazzar.openExternal === 'function') {
           window.bazzar.openExternal(url);
