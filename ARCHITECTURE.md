@@ -14,8 +14,13 @@ FastAPI sidecar (backend/server.py)       — local-only API, never fabricates n
   ├─ backend/calendar.py + data/          — NSE trading calendar (seeded 2025–2026 window)
   ├─ backend/ingestion.py                 — ingestion_runs audit (asOf / staleness reporting)
   ├─ backend/backup.py                    — parquet snapshots, retention 14 daily + 12 monthly
-  ├─ backend/openalgo_client.py           — market data client (provider swap → Kite in P3)
+  ├─ backend/providers/                   — MarketDataProvider protocol + implementations:
+  │     kite.py (PRIMARY, Zerodha Kite Connect), openalgo.py (fallback),
+  │     nse_bhavcopy.py (free NSE EOD fallback), ratelimit.py (shared token bucket)
+  ├─ backend/kite_auth.py                 — Kite session in the OS keyring ONLY (never .env/DB/git)
+  ├─ backend/sync_instruments.py          — instrument master → securities (tokens, lot/tick size)
   ├─ backend/fetch_daily / fetch_indices  — checkpointed, alphabetical, validated daily pulls
+  │     (--provider flag; per-symbol failures → partial run, auth failure → abort)
   ├─ backend/charts.py                    — matplotlib (Agg) PNG chart renderers
   └─ backend/settings.py / logging_config.py — validated config + structured logs
 
@@ -27,13 +32,21 @@ archive/                                  — legacy sources, reference only, ne
 
 ## Data flow (daily)
 
+0. Auth (Kite): `python -m backend.kite_auth set-secret` once, then the
+   renderer's "Connect Kite" button → Zerodha redirect login →
+   `/api/auth/kite/callback` stores the daily access token in the OS keyring.
+   `python -m backend.sync_instruments --provider kite` refreshes the
+   instrument master (instrument_token/lot_size/tick_size on `securities`).
 1. `python -m backend.fetch_indices` / `fetch_daily` pull daily bars from the
-   configured market-data provider, in strict alphabetical order. Every batch
+   configured market-data provider (`--provider kite|openalgo|nse_bhavcopy`),
+   in strict alphabetical order. Every batch
    passes `backend/validation.py`: valid rows are upserted idempotently,
    invalid rows are quarantined in `data_rejects` with a reason (never
    silently dropped, never crashing the run); `fetch_checkpoint` records the
    last completed symbol so an interrupted run resumes at the next one. Each
-   run is audited in `ingestion_runs` (rows written/rejected, status, error).
+   run is audited in `ingestion_runs` (rows written/rejected, status, error);
+   a run with skipped symbols finishes `partial`, an auth failure aborts
+   (re-authenticate, then rerun — the checkpoint resumes where it stopped).
 2. Dates are checked against the `trading_calendar` (NSE, seeded from
    `backend/data/nse_calendar.csv`; refresh annually when NSE publishes the
    next calendar). Outside the seeded coverage window the calendar check is
@@ -65,7 +78,9 @@ archive/                                  — legacy sources, reference only, ne
 
 1. **Never fabricate numbers.** Missing data ⇒ `null`/`[]`, never placeholders.
 2. **DuckDB is the only store**; `db_config.json` is the single schema source.
-3. **Credentials never enter git** — `.env` (gitignored) today, OS keyring in P6.
+3. **Credentials never enter git** — `.env` (gitignored) holds only non-secret
+   keys; Kite's API secret and daily access token live in the OS keyring
+   (`backend/kite_auth.py`), never in .env/DB/git.
 4. **Daily timeframe only** from the broker API (rate-limit respect).
 5. **All renderer data via the API** (`src/api.js`); no mock data in `src/`.
 6. Electron: `contextIsolation`, `sandbox`, no `nodeIntegration`, narrow
@@ -88,4 +103,6 @@ archive/                                  — legacy sources, reference only, ne
 ## Roadmap status
 
 v2.0 execution follows `BAZZAR_ROADMAP.md` (P0 repo hygiene + P1 tooling in
-1.3.0; P2 data-layer hardening in 1.4.0; P3 Kite Connect migration next).
+1.3.0; P2 data-layer hardening in 1.4.0; P3 Kite Connect in 1.5.0 — live
+quotes via KiteTicker (3.5) deliberately deferred; P4 gov-data ingestion
+next).

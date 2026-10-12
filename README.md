@@ -178,11 +178,18 @@ the TradingView/lightweight-charts components:
   configuration file, `backend/db_config.json` (tables, the full NSE/BSE/MCX
   index universe, the macro-indicator registry, and the fetch policy).
   Bootstrap it with `python -m backend.db`.
-- **OpenAlgo (Motilal Oswal) market data** — `backend/openalgo_client.py`
-  talks to a self-hosted OpenAlgo server. Per the broker docs, credentials go
-  in a local `.env` (copy `.env.example`): `BROKER_API_KEY` is your Motilal
-  client code and `BROKER_API_SECRET` is the generated API key. `.env` is
-  gitignored — credentials are never committed.
+- **Kite Connect market data (primary, P3)** — `backend/providers/kite.py`
+  uses the official Zerodha Kite Connect API. Create an app at
+  <https://developers.kite.trade>, put the non-secret `KITE_API_KEY` in `.env`,
+  and store the API secret in the OS keyring with
+  `python -m backend.kite_auth set-secret` (the secret and the daily access
+  token never touch `.env`/DB/git). Click **Connect Kite** in the topbar once
+  per day (Kite tokens expire daily), then sync the instrument master with
+  `python -m backend.sync_instruments --provider kite` and backfill with
+  `python -m backend.fetch_daily --provider kite`.
+- **Provider fallbacks** — `MARKET_DATA_PROVIDER=openalgo` (self-hosted
+  OpenAlgo + Motilal Oswal; credentials in gitignored `.env`) or
+  `nse_bhavcopy` (free official NSE end-of-day archives, no credentials).
 - **Daily timeframe only** — to respect API rate limits, only daily (`D`)
   candles are fetched, in strict alphabetical symbol order, with a
   `fetch_checkpoint` table so an interrupted pull resumes where it stopped
@@ -204,9 +211,12 @@ Setup:
 ```bash
 python -m venv .venv && . .venv/bin/activate   # or .venv\Scripts\activate on Windows
 pip install -r requirements.txt
-cp .env.example .env                            # fill in your OpenAlgo credentials
+cp .env.example .env                            # set KITE_API_KEY (or OpenAlgo credentials)
+python -m backend.kite_auth set-secret          # store KITE_API_SECRET in the OS keyring
 python -m backend.db                            # create the DuckDB database
-python -m backend.fetch_indices                 # sync index data (daily)
+python -m backend.sync_instruments --provider kite   # instrument master (tokens)
+python -m backend.fetch_daily --provider kite   # backfill equities (daily, checkpointed)
+python -m backend.fetch_indices --provider kite # sync index data (daily)
 python -m backend.server                        # serve the local API + charts
 npm run dev                                     # renderer (browser mode)
 ```

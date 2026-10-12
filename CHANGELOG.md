@@ -3,6 +3,50 @@
 All notable changes to Bazzar Terminal. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 versioning: [SemVer](https://semver.org/).
 
+## [1.5.0] - 2026-09-07
+
+### Added (P3 — Kite Connect integration)
+- **Provider abstraction** (`backend/providers/`): a `MarketDataProvider`
+  protocol (daily history, quotes, instrument master) with explicit
+  `ProviderError` / `ProviderAuthRequired` / `ProviderCapabilityError`
+  semantics. Fetchers are provider-agnostic; tests inject fakes.
+- **Kite Connect provider** (`providers/kite.py`): primary market-data
+  source. Daily-only (`interval="day"` hardcoded), historical windows chunked
+  at ≤ 2000 days per call (a 10-year backfill is 2 chunks/symbol), ~2.5
+  requests/second token bucket with jitter, tenacity exponential backoff on
+  429/5xx/network errors, and `TokenException` → `KiteAuthRequired` with NO
+  retry-loop (Kite tokens expire daily — re-authentication is a user action).
+- **Kite auth flow** (`backend/kite_auth.py` + 4 API endpoints): redirect
+  login (`GET /api/auth/kite/login-url`), exchange callback
+  (`GET /api/auth/kite/callback`), status (`GET /api/auth/kite/status`),
+  disconnect (`POST /api/auth/kite/disconnect`). The access token and
+  `KITE_API_SECRET` live in the **OS keyring only** — never .env/DB/git;
+  `.env` holds only the non-secret `KITE_API_KEY`. CLI:
+  `python -m backend.kite_auth set-secret|status|logout`.
+- **Instrument-master sync** (`backend/sync_instruments.py` + migration
+  `0003_kite_instruments.sql`): `securities` gains `instrument_token`,
+  `lot_size`, `tick_size`; sync upserts the NSE/BSE master (index segment →
+  `*_INDEX` exchanges), deactivates — never deletes — vanished listings, and
+  refuses to deactivate anything on an empty dump. Audited via
+  `ingestion_runs` (job `instrument_sync`).
+- **NSE bhavcopy fallback provider** (`providers/nse_bhavcopy.py`): official
+  NSE archive CSVs, polite headers, backoff on 429/5xx, 404 = holiday.
+  EOD-only (no quotes/instruments — raises `ProviderCapabilityError`).
+- **Renderer**: `KiteStatus` pill in the topbar (polls status every 30s;
+  "Connect Kite" opens the login URL in the system browser via a new
+  allowlisted `shell:open-external` IPC — https + kite.trade hosts only).
+- **Tests**: 41 new tests — provider protocol, chunking, retry/auth mapping,
+  keyring auth store, auth endpoints, instrument sync, provider-flag fetch
+  semantics (partial vs failed runs), bhavcopy parsing.
+
+### Changed
+- `fetch_daily` / `fetch_indices` accept `--provider {kite,openalgo,nse_bhavcopy}`
+  (default: `MARKET_DATA_PROVIDER` setting, `openalgo`). Per-symbol failures
+  skip the symbol, advance the checkpoint, and finish the run as **partial**
+  (new `ingestion_runs` status); auth failures abort with exit code 3.
+- `backend/openalgo_client.py` is now a compatibility shim re-exporting from
+  `backend/providers/openalgo.py`.
+
 ## [1.4.0] - 2026-09-07
 
 ### Added (P2 — data layer hardening)

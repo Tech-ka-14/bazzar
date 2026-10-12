@@ -79,12 +79,23 @@ interfaces exactly.
   tables: `securities`, `daily_ohlcv`, `index_daily`, `index_master`,
   `macro_series`, `macro_observations`, `benchmark_series`,
   `benchmark_observations`, `fetch_checkpoint`.
-- `openalgo_client.py` — `OpenAlgoClient` reading `.env`; methods
-  `history(symbol, exchange, start_date, end_date)` (interval hardcoded "D"),
-  `quotes(symbol, exchange)`, `search(query)`; polite rate limiting.
-- `fetch_daily.py` — alphabetical daily OHLCV pull with checkpoint resume.
+- `openalgo_client.py` — compatibility shim re-exporting from
+  `providers/openalgo.py` (kept for existing imports).
+- `providers/` — market-data provider abstraction (P3): `base.py`
+  (`MarketDataProvider` protocol, `Bar`/`Instrument`/`Quote` types,
+  `ProviderError`/`ProviderAuthRequired`/`ProviderCapabilityError`),
+  `ratelimit.py` (shared token bucket), `kite.py` (Zerodha Kite Connect —
+  primary), `openalgo.py` (fallback), `nse_bhavcopy.py` (free EOD fallback),
+  `__init__.py` (registry + `get_provider()` factory + `load_token_map()`).
+- `kite_auth.py` — Kite session store in the OS keyring ONLY (access token +
+  API secret never touch .env/DB/git); CLI `set-secret|status|logout`.
+- `sync_instruments.py` — Kite instrument master → `securities` upsert
+  (instrument_token/lot_size/tick_size; index segment → `*_INDEX` exchanges;
+  vanished listings deactivated, never deleted).
+- `fetch_daily.py` — alphabetical daily OHLCV pull with checkpoint resume;
+  `--provider` flag (P3), per-symbol failures → partial run.
 - `fetch_indices.py` — daily OHLC + 52-week high/low for every index in
-  `index_master`.
+  `index_master`; same `--provider` semantics.
 - `macro.py` — macro indicator registry loader + observation import helpers.
 - `charts.py` — matplotlib candlestick/line PNG renderers.
 - `server.py` — FastAPI app (uvicorn, port `BAZZAR_API_PORT`, default 8787).
@@ -107,6 +118,13 @@ interfaces exactly.
 - `GET /api/benchmarks/{key}/chart.png` → PNG line chart
 - `GET /api/macro` → `[{key, title, category, unit, frequency, source,
   sourceUrl, latest, period, change}]` for the whole macro registry
+- `GET /api/auth/kite/login-url` → `{url}` for the Zerodha redirect login
+  (503 when `KITE_API_KEY` is not configured)
+- `GET /api/auth/kite/callback?request_token=...` → exchanges the token for a
+  session stored in the OS keyring → `{status: "connected", user_id, user_name}`
+- `GET /api/auth/kite/status` → non-secret auth state `{configured,
+  api_key_set, authenticated, user, login_time, expires_hint}` — never tokens
+- `POST /api/auth/kite/disconnect` → clears the session (keeps the API secret)
 - All list endpoints return `null`/`[]` fields (never fabricated numbers)
   when data has not been synced yet; the UI shows an "awaiting data sync"
   state.
@@ -134,6 +152,9 @@ interfaces exactly.
   `RepoRatesChart.jsx`, `SGBChart.jsx`, `USTreasuryBondsChart.jsx`,
   `USDINRChart.jsx` (replaced by backend-PNG chart cards); the
   `lightweight-charts` dependency is removed from `package.json`.
+- `src/components/KiteStatus.jsx` — topbar pill polling
+  `/api/auth/kite/status` every 30s; "Connect Kite" opens the login URL in
+  the system browser via the allowlisted `shell:open-external` IPC.
 - UI/UX: keep the existing black/gold theme (`src/theme.js`).
 
 ## Electron / config glue (main agent)
