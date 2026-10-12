@@ -3,6 +3,66 @@
 All notable changes to Bazzar Terminal. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 versioning: [SemVer](https://semver.org/).
 
+## [1.7.0] - 2026-10-12
+
+### Added (P5 — backend API hardening, roadmap 5.1–5.5)
+- **Localhost bearer-token handshake (5.1):** the Electron main process
+  generates a random 32-byte hex token per launch (`crypto.randomBytes`),
+  passes it to the FastAPI sidecar via `BAZZAR_API_TOKEN`, and exposes it to
+  the renderer over a new `get-api-token` IPC (`window.bazzar.getApiToken()`
+  in `preload.cjs`). `src/api.js` attaches `Authorization: Bearer <token>` to
+  every request. A new `BearerAuthMiddleware` returns 401 (in the standard
+  error envelope) for any `/api/*` request without the matching token when
+  the env var is set; unset = documented open dev fallback. Sole exemption:
+  `/api/auth/kite/callback` (+ `/api/v1` twin) — the external browser is
+  redirected there by kite.trade after login and cannot know the token; the
+  one-time `request_token` is itself the credential.
+- **CORS lockdown (5.2):** `allow_origins` is exactly the Vite dev origins
+  plus `"null"` (packaged Electron `file://` pages send `Origin: null`);
+  methods narrowed to GET/POST, headers to Authorization/Content-Type/
+  If-None-Match. The server binds `127.0.0.1` only (unchanged, now
+  documented).
+- **Contract hardening (5.3):** single error envelope
+  `{"error": {"code", "message"}}` via global exception handlers
+  (HTTPException → snake_case status code, validation → 422
+  `validation_error`, catch-all → 500 `internal_error` with server-side
+  traceback logging, never leaking internals). Every request gets an
+  `X-Request-ID` (uuid4, bound to structlog context). All routes now live
+  under `/api/v1`; the flat `/api` mount stays as a deprecated alias for one
+  release (excluded from the OpenAPI schema) and the renderer calls
+  `/api/v1`. New `backend/schemas.py` holds pydantic response models wired
+  as `response_model=` on the main GET endpoints (indices, home/indices,
+  macro, benchmarks, search, quotes, kite auth, health/ready/health-data).
+- **Performance (5.4):** `GZipMiddleware` (1KB minimum); weak body-hash
+  ETags with `If-None-Match` → 304 on `/api/indices`, `/api/macro*` and
+  `/api/benchmarks*`; chart PNGs are now cache-first with a data-fingerprint
+  manifest under `<data dir>/cache/charts/<kind>/<key>_<paramhash>.png` +
+  `manifest.json` (unchanged data → cache hit, fresh sync → re-render, the
+  matplotlib generation path itself unchanged); chart rendering is capped by
+  an `asyncio.Semaphore` (`BAZZAR_API_CONCURRENCY`, default 4) and moved off
+  the event loop via `run_in_threadpool`.
+- **Readiness & graceful shutdown (5.5):** `/api/health` stays liveness;
+  new `/api/health/ready` checks DuckDB opens, migrations are at latest and
+  the data dir is writable → 200 `{"status": "ready", ...}` else 503
+  envelope. The sidecar logs a clean shutdown event on SIGTERM/SIGINT;
+  Electron now SIGTERMs the sidecar on quit and SIGKILLs it after a 3s
+  grace period.
+- **Renderer:** chart `<img>` consumers fetch PNGs as authenticated blobs
+  through `fetchChartObjectUrl()` (object URLs, revoked on cleanup) inside
+  `ChartImage.jsx`; `KiteStatus.jsx` now goes through `apiGet` like every
+  other component. `index.html` CSP `img-src` gains `blob:` for the object
+  URLs.
+
+### Tests (P5)
+- New suites: `test_api_auth.py` (401/200 matrix + dev fallback + callback
+  exemption), `test_api_contracts.py` (envelope shapes on 401/404/422/500,
+  X-Request-ID, v1/alias equivalence, CORS allow/deny, exact response-shape
+  keys), `test_api_perf.py` (ETag 200→304, gzip, warm indices p95 timing),
+  `test_health_ready.py` (liveness vs readiness incl. unwritable data dir),
+  `test_chart_cache.py` (manifest caching, fingerprint invalidation, per-
+  param cache keys); vitest coverage for the bearer header + chart blob
+  fetching in `src/__tests__/api.test.js`.
+
 ## [1.6.0] - 2026-10-12
 
 ### Added (P4-A — government / open-data source fetchers)
