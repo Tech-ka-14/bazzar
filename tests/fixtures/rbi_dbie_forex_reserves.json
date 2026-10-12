@@ -1,0 +1,39 @@
+{
+  "body": {
+    "result": [
+      {
+        "data": {
+          "result": [
+            {
+              "DATAFLOW": "RBI:FR_EXG_RESV_RN",
+              "FREQ": "W",
+              "TIME_PERIOD": "2026-09-12",
+              "OBS_VALUE": 641235.5,
+              "typ_maj_fr_exc_res_rn_description": "Foreign Exchange Reserves",
+              "unit_measure_description": "US dollar",
+              "UNIT_MULT": "6"
+            },
+            {
+              "DATAFLOW": "RBI:FR_EXG_RESV_RN",
+              "FREQ": "W",
+              "TIME_PERIOD": "2026-09-12",
+              "OBS_VALUE": 545102.3,
+              "typ_maj_fr_exc_res_rn_description": "Foreign Currency Assets",
+              "unit_measure_description": "US dollar",
+              "UNIT_MULT": "6"
+            },
+            {
+              "DATAFLOW": "RBI:FR_EXG_RESV_RN",
+              "FREQ": "W",
+              "TIME_PERIOD": "2026-09-19",
+              "OBS_VALUE": 642518.9,
+              "typ_maj_fr_exc_res_rn_description": "Foreign Exchange Reserves",
+              "unit_measure_description": "US dollar",
+              "UNIT_MULT": "6"
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

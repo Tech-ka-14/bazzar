@@ -1,0 +1,36 @@
+{
+  "body": {
+    "result": [
+      {
+        "data": {
+          "result": [
+            {
+              "DATAFLOW": "RBI:YIELD_TB_RN",
+              "FREQ": "M",
+              "TIME_PERIOD": "2026-08",
+              "OBS_VALUE": 6.4891,
+              "mat_term_d_rn_description": "15-91 days",
+              "unit_measure_description": "Percent"
+            },
+            {
+              "DATAFLOW": "RBI:YIELD_TB_RN",
+              "FREQ": "M",
+              "TIME_PERIOD": "2026-08",
+              "OBS_VALUE": 6.612,
+              "mat_term_d_rn_description": "92-182 days",
+              "unit_measure_description": "Percent"
+            },
+            {
+              "DATAFLOW": "RBI:YIELD_TB_RN",
+              "FREQ": "M",
+              "TIME_PERIOD": "2026-09",
+              "OBS_VALUE": 6.5134,
+              "mat_term_d_rn_description": "15-91 days",
+              "unit_measure_description": "Percent"
+            }
+          ]
+        }
+      }
+    ]
+  }
+}
