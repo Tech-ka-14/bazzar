@@ -8,4 +8,9 @@ point that writes through the validated upsert helpers inside an
 
 Series codes / endpoint parameters live in db_config.json -> sources —
 never hardcoded here (SPEC: db_config.json is the single source of truth).
+
+Modules: ``rbi`` (RBI DBIE), ``intl`` (US Treasury + FRED), ``mospi``
+(data.gov.in OGD), ``nse_open`` (holidays + FII/DII), and ``sync_all`` —
+the one-command seed CLI that runs every source and then the
+``backend.reconcile`` data-quality checks (P4-C).
 """
