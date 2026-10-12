@@ -1276,6 +1276,21 @@
           "name": "US Fed Funds Rate"
         }
       ]
+    },
+    {
+      "key": "fii_dii",
+      "title": "FII/DII Daily Flows",
+      "unit": "₹ crore",
+      "series": [
+        {
+          "key": "fii_net",
+          "name": "FII Net"
+        },
+        {
+          "key": "dii_net",
+          "name": "DII Net"
+        }
+      ]
     }
   ],
   "sources": {
@@ -1373,6 +1388,52 @@
       "base_url": "https://api.stlouisfed.org/fred/series/observations",
       "fred_series_id": "FEDFUNDS",
       "note": "Effective federal funds rate, monthly, percent; observation date is the first of the month. API key via FRED_API_KEY."
+    },
+    "ogd": {
+      "base_url": "https://api.data.gov.in",
+      "resource_path": "/resource",
+      "format": "json",
+      "limit": 100,
+      "note": "Open Government Data (data.gov.in) API — GET {base_url}/resource/{resource_id}?api-key={OGD_API_KEY}&format=json&limit=... returns {\"records\": [...]}. Resource IDs were located 2026-10 via public OGD usage (the data.gov.in site 403s scripted catalog access) and could not be re-verified live from the build environment; field-name candidates are best-effort — rows lacking the configured fields are dropped, never defaulted. Empty resource_id = no live OGD series exists (skipped with a log line; unsynced beats fabricated).",
+      "resources": {
+        "cpi_inflation": {
+          "resource_id": "9d67b242-0243-4298-adf9-7617dbeba7ab",
+          "value_field": ["inflation_rate", "yoy_inflation", "inflation", "value"],
+          "period_field": ["period", "month", "year_month", "date"],
+          "period_format": "monthly",
+          "note": "All-India CPI headline retail inflation (% YoY), monthly. Resource id live-confirmed against api.data.gov.in on 2026-08-21 (via api.data.gov.in/lists catalog search; documented in public OGD client code). Exact field names unverified from the build environment — candidates listed in priority order, first non-null cell wins."
+        },
+        "wpi_inflation": {
+          "resource_id": "239ac3d0-f08d-40d0-b03c-9b7a426a62d5",
+          "value_field": ["inflation_rate", "yoy_inflation", "inflation", "wpi_inflation", "value"],
+          "period_field": ["period", "month", "year_month", "date"],
+          "period_format": "monthly",
+          "note": "Wholesale Price Index (Base Year 2011-12), monthly, 'till last month' — resource id live-confirmed 2026-08-21 (same provenance as cpi_inflation). If the dataset publishes the index level rather than the YoY rate the value_field mapping must be corrected before trusting synced values."
+        },
+        "iip": {
+          "resource_id": "",
+          "value_field": ["value"],
+          "period_field": ["period", "month"],
+          "period_format": "monthly",
+          "note": "GAP (documented 2026-10): no live IIP OGD resource — data.gov.in carries only stale/one-off IIP tables; MoSPI publishes IIP via eSankhyiki (api.mospi.gov.in) and PIB releases. Skipped with a log line until an eSankhyiki fetcher is wired (P4 follow-up)."
+        },
+        "gdp_growth": {
+          "resource_id": "",
+          "value_field": ["value"],
+          "period_field": ["period", "quarter"],
+          "period_format": "quarterly",
+          "note": "GAP (documented 2026-10): GDP growth is not published as an OGD resource — MoSPI releases it via press note / PIB (quarterly NAS). Skipped with a log line until an eSankhyiki fetcher is wired (P4 follow-up)."
+        }
+      }
+    },
+    "nse_open": {
+      "base_url": "https://www.nseindia.com",
+      "holidays_path": "/api/holiday-master?type=trading",
+      "fii_dii_path": "/api/fiidiiTradeReact",
+      "constituents_path": "/api/equity-stockIndices",
+      "holiday_segments": ["CM"],
+      "constituent_cache_hours": 6,
+      "note": "NSE public JSON APIs (undocumented but stable). holiday-master returns segment-keyed holiday lists (CM = capital market); special trading sessions (Muhurat) are parsed as trading days, matching backend/data/nse_calendar.csv. fiidiiTradeReact returns flat FII/DII rows in ₹ crore. equity-stockIndices?index=... is cached under BAZZAR_DATA_DIR/cache/nse/. The site sits behind a cookie wall — a plain GET to the base URL bootstraps the session."
     }
   }
 }
