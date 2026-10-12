@@ -736,7 +736,7 @@
       "symbol": "NIFTY COMMODITIES",
       "name": "NIFTY COMMODITIES",
       "exchange": "NSE_INDEX",
-      "category": "sectoral",
+      "category": "commodity",
       "sort_order": 70
     },
     {
@@ -1277,5 +1277,102 @@
         }
       ]
     }
-  ]
+  ],
+  "sources": {
+    "rbi": {
+      "base_url": "https://data.rbi.org.in",
+      "gateway_path": "/CIMS_Gateway_DBIE/GATEWAY/SERVICES",
+      "token_service": "security_generateSessionToken",
+      "data_service": "dbie_getImpalaDQActionEnhanced",
+      "channel_key": "key2",
+      "note": "RBI DBIE gateway shape verified 2026-10 (dbie-portal-anatomy.md of the RBIH dbie.rbihub.in mirror). Series data responses are HTML-entity-encoded JSON; rows carry SDMX columns TIME_PERIOD / OBS_VALUE plus per-dimension description columns. The SPA AES-256-CBC-encrypts data-query request fields with a static bundle key; if RBI enforces that on the wire, fetches fail loudly and sync records a failed/partial run (never fabricate).",
+      "macro_series": {
+        "repo_rate": {
+          "service": "dbie_getImpalaDQActionEnhanced",
+          "params": {},
+          "note": "Policy rates are NOT in the DBIE SDMX data-query catalogue; they live in the 'Key Rates' indicators report (report id 531) behind the BOE OpenDocument guest-token chain. Empty params = skipped with a log line until that chain is wired (P4 follow-up)."
+        },
+        "reverse_repo_rate": {
+          "service": "dbie_getImpalaDQActionEnhanced",
+          "params": {},
+          "note": "See repo_rate."
+        },
+        "crr": {
+          "service": "dbie_getImpalaDQActionEnhanced",
+          "params": {},
+          "note": "See repo_rate."
+        },
+        "forex_reserves": {
+          "service": "dbie_getImpalaDQActionEnhanced",
+          "params": {
+            "dsdCode": "FR_EXG_RESV_RN"
+          },
+          "dimension_column": "typ_maj_fr_exc_res_rn_description",
+          "dimension_values": [
+            "FER_TTL",
+            "Foreign Exchange Reserves"
+          ],
+          "value_scale": 0.001,
+          "note": "Weekly forex reserves, total (FER_TTL) in US dollars. DBIE/WSS publishes US$ million (SDMX UNIT_MULT=6); registry unit is USD bn -> value_scale 0.001."
+        }
+      },
+      "benchmark_series": {
+        "in_gsec_10y": {
+          "service": "dbie_getImpalaDQActionEnhanced",
+          "params": {
+            "dsdCode": "YIELD_GOV_SEC_RN"
+          },
+          "dimension_column": "mat_per_rn_description",
+          "dimension_values": [
+            "10"
+          ],
+          "note": "Monthly yield of SGL transactions in government dated securities, residual maturity 10 years (percent)."
+        },
+        "in_gsec_5y": {
+          "service": "dbie_getImpalaDQActionEnhanced",
+          "params": {
+            "dsdCode": "YIELD_GOV_SEC_RN"
+          },
+          "dimension_column": "mat_per_rn_description",
+          "dimension_values": [
+            "5"
+          ],
+          "note": "Same element as in_gsec_10y, residual maturity 5 years."
+        },
+        "in_gsec_91d": {
+          "service": "dbie_getImpalaDQActionEnhanced",
+          "params": {
+            "dsdCode": "YIELD_TB_RN"
+          },
+          "dimension_column": "mat_term_d_rn_description",
+          "dimension_values": [
+            "15TO91",
+            "15-91 days"
+          ],
+          "note": "Monthly yield of SGL transactions in treasury bills, 15-91 days residual maturity (91-day T-bill), percent."
+        },
+        "rbi_repo": {
+          "service": "dbie_getImpalaDQActionEnhanced",
+          "params": {},
+          "note": "Date-keyed repo rate; same 'Key Rates' report gap as the repo_rate macro series (see sources.rbi note)."
+        }
+      }
+    },
+    "us_treasury": {
+      "series_key": "us_10y",
+      "base_url_template": "https://home.treasury.gov/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/{year}/all?type=daily_treasury_yield_curve&field_tdr_date_value={year}&page&_format=csv",
+      "date_column": "Date",
+      "yield_columns": [
+        "BC_10YEAR",
+        "10 Yr"
+      ],
+      "note": "Daily Treasury par yield curve rates CSV; BC_10YEAR is the current column name, '10 Yr' the legacy one."
+    },
+    "fred": {
+      "series_key": "us_fed_funds",
+      "base_url": "https://api.stlouisfed.org/fred/series/observations",
+      "fred_series_id": "FEDFUNDS",
+      "note": "Effective federal funds rate, monthly, percent; observation date is the first of the month. API key via FRED_API_KEY."
+    }
+  }
 }
