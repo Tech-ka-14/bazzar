@@ -28,4 +28,9 @@ contextBridge.exposeInMainWorld('bazzar', {
   // -> { enabled, updateAvailable, currentVersion, latestVersion, message,
   //     url, publishedAt, source, error }
   checkForUpdates: () => ipcRenderer.invoke('update:check'),
+
+  // --- External browser (P3: Kite Connect login) ---
+  // Opens an allowlisted https URL (kite.trade domains only) in the system
+  // browser; new windows inside the app stay denied.
+  openExternal: (url) => ipcRenderer.invoke('shell:open-external', url),
 });

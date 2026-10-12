@@ -9,7 +9,9 @@
 //  - update:check        update notification check against the packaged
 //                        electron/update-manifest.json (or the optional remote
 //                        manifest at BAZZAR_UPDATE_MANIFEST_URL)
-const { app, BrowserWindow, ipcMain } = require('electron');
+//  - shell:open-external open an allowlisted https URL in the system browser
+//                        (P3: Kite Connect login — kite.trade only)
+const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
@@ -782,6 +784,24 @@ app.whenReady().then(() => {
 
   // Update notification IPC.
   ipcMain.handle('update:check', () => checkForUpdates());
+
+  // Open an allowlisted https URL in the system browser (P3: Kite Connect
+  // redirect login). New windows stay denied, so the renderer asks the main
+  // process; anything outside the allowlist or not https is refused.
+  const ALLOWED_EXTERNAL_HOSTS = new Set(['kite.trade', 'developers.kite.trade']);
+  ipcMain.handle('shell:open-external', (_event, url) => {
+    let parsed;
+    try {
+      parsed = new URL(typeof url === 'string' ? url : '');
+    } catch {
+      return { ok: false, error: 'Invalid URL' };
+    }
+    if (parsed.protocol !== 'https:' || !ALLOWED_EXTERNAL_HOSTS.has(parsed.hostname)) {
+      return { ok: false, error: 'URL not allowed' };
+    }
+    shell.openExternal(parsed.toString());
+    return { ok: true };
+  });
 
   // Local data backend (best effort; tolerant of missing Python).
   startBackendSidecar();

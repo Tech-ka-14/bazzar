@@ -9,6 +9,7 @@ import Benchmarks from './components/Benchmarks.jsx';
 import Indices from './components/Indices.jsx';
 import InternationalMarkets from './components/InternationalMarkets.jsx';
 import Scraper from './components/Scraper.jsx';
+import KiteStatus from './components/KiteStatus.jsx';
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -114,7 +115,7 @@ function Topbar({ activePage, setActivePage }) {
     'Scraper',
   ];
   return (
-    <nav className="bg-gray-900 border-b-2 border-yellow-500 p-4 flex gap-6 overflow-x-auto">
+    <nav className="bg-gray-900 border-b-2 border-yellow-500 p-4 flex items-center gap-6 overflow-x-auto">
       {pages.map((page) => (
         <button
           key={page}
@@ -124,6 +125,7 @@ function Topbar({ activePage, setActivePage }) {
           {page}
         </button>
       ))}
+      <KiteStatus />
     </nav>
   );
 }
