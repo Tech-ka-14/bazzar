@@ -105,11 +105,51 @@ interfaces exactly.
   `mospi.py`, `nse_open.py`, plus `sync_all.py` (one-command seed:
   all sources + reconcile; missing keys/offline = clean skips, exit 1 only
   on hard failures).
-- `charts.py` — matplotlib candlestick/line PNG renderers.
-- `server.py` — FastAPI app (uvicorn, port `BAZZAR_API_PORT`, default 8787).
+- `charts.py` — matplotlib candlestick/line PNG renderers + the cache-first
+  chart store (`<data dir>/cache/charts/...` + `manifest.json`, keyed by data
+  fingerprint) (P5).
+- `middleware.py` — `RequestIDMiddleware` (X-Request-ID + structlog binding),
+  `BearerAuthMiddleware` (P5 token gate), `WeakETagMiddleware` (304s on the
+  slow-changing GETs), and the shared `error_envelope()` shape (P5).
+- `schemas.py` — pydantic response models wired as `response_model=` on the
+  main GET endpoints; this file *is* the machine-checked API contract (P5).
+- `server.py` — FastAPI app (uvicorn, port `BAZZAR_API_PORT`, default 8787,
+  loopback-only bind to `127.0.0.1`).
 
 ## Local HTTP API contract (base `http://127.0.0.1:8787`)
-- `GET /api/health` → `{ok, db, version}`
+
+Versioning & envelope (P5, roadmap 5.1–5.3):
+- All routes are mounted under `/api/v1`; the flat `/api` mount remains as a
+  **deprecated** alias for one release (identical responses, excluded from
+  the OpenAPI schema). The renderer calls `/api/v1` only.
+- **Auth:** when `BAZZAR_API_TOKEN` is set (the Electron shell generates a
+  random 32-byte hex token per launch and passes it to the sidecar), every
+  `/api/*` request must carry `Authorization: Bearer <token>` — else 401.
+  When the variable is unset (plain `python -m backend.server` dev run) the
+  API is open: a documented development fallback. Sole exemption:
+  `GET /api/auth/kite/callback` (the external-browser Kite redirect cannot
+  know the token; its one-time `request_token` is the credential).
+- **Error envelope:** every non-2xx JSON error is
+  `{"error": {"code": "<snake_case>", "message": "<human readable>"}}` —
+  HTTPException → snake_case of its status phrase, request validation →
+  `422 validation_error`, anything unexpected → `500 internal_error`
+  (traceback logged server-side with the request id, never leaked).
+- Every response carries an `X-Request-ID` header (uuid4; an incoming
+  `X-Request-ID` is echoed) bound to the server log lines.
+- CORS allows exactly `http://localhost:5173`, `http://127.0.0.1:5173` and
+  `"null"` (packaged Electron `file://` pages send `Origin: null`); methods
+  GET/POST, headers Authorization/Content-Type/If-None-Match.
+- Health trio: `GET /api/health` is **liveness** (always 200
+  `{ok, db, version}` when the process serves); `GET /api/health/ready` is
+  **readiness** (DuckDB opens + migrations at latest + data dir writable →
+  200 `{status: "ready", db, version}`, else 503 envelope);
+  `GET /api/health/data` is the data-quality report below.
+
+Endpoints (paths shown under the deprecated alias; prepend `/v1` for the
+canonical mount):
+- `GET /api/health` → `{ok, db, version}` (liveness)
+- `GET /api/health/ready` → `{status, db, version}` (readiness; 503 envelope
+  when the data dir is unwritable, DuckDB fails, or migrations are pending)
 - `GET /api/health/data` → `{status, checks, summary, asOf}` — data-quality
   status from `data_quality` (P4-C): latest row per (check_name, target);
   `red` on an unresolved fail younger than 48h, `amber` on any current warn
@@ -144,6 +184,13 @@ interfaces exactly.
 ## Renderer contract (`src/`)
 - API base: `import.meta.env.VITE_API_BASE || 'http://127.0.0.1:8787'`,
   centralised in `src/api.js` (tiny fetch wrapper + `chartUrl()` helpers).
+- Auth (P5): the renderer obtains the per-launch bearer token from
+  `window.bazzar.getApiToken()` (Electron preload → main-process IPC) and
+  `src/api.js` sends it as `Authorization: Bearer <token>` on every request.
+  Chart PNGs cannot carry headers in an `<img>` tag, so `ChartImage.jsx`
+  fetches them as authenticated blobs (`fetchChartObjectUrl`) and renders
+  object URLs (revoked on cleanup); CSP `img-src` therefore includes
+  `blob:`. All paths are the versioned `/api/v1/...`.
 - `src/components/SearchInput.jsx` — reusable dictionary-search input with
   debounced `/api/search` dropdown + keyboard navigation; used at every stock
   search location (Home portfolio add, Equity watchlist add, deep-dive
