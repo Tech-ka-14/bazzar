@@ -75,7 +75,7 @@ class Settings(BaseSettings):
 
     @property
     def log_dir(self) -> Path:
-        return self.b_dir / "logs"
+        return self.bazzar_data_dir / "logs"
 
     @property
     def chart_cache_dir(self) -> Path:
