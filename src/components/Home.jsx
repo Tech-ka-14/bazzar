@@ -13,7 +13,7 @@ export default function Home() {
   // Live index snapshot cards from the local data platform.
   useEffect(() => {
     let cancelled = false;
-    apiGet('/api/home/indices')
+    apiGet('/api/v1/home/indices')
       .then((data) => {
         if (!cancelled) setIndices(Array.isArray(data) ? data : []);
       })
@@ -35,7 +35,7 @@ export default function Home() {
     let cancelled = false;
     const symbols = portfolio.map((item) => item.symbol).join(',');
     const load = () => {
-      apiGet(`/api/quotes?symbols=${encodeURIComponent(symbols)}`)
+      apiGet(`/api/v1/quotes?symbols=${encodeURIComponent(symbols)}`)
         .then((data) => {
           if (!cancelled) setQuotes((data && data.symbols) || {});
         })

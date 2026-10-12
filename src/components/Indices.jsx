@@ -30,7 +30,7 @@ export default function Indices() {
 
   useEffect(() => {
     let cancelled = false;
-    apiGet('/api/indices')
+    apiGet('/api/v1/indices')
       .then((data) => {
         if (!cancelled) setIndices(Array.isArray(data) ? data : []);
       })

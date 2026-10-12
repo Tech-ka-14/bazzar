@@ -9,7 +9,7 @@ export default function Currency() {
 
   useEffect(() => {
     let cancelled = false;
-    apiGet(`/api/quotes?symbols=${encodeURIComponent(MAIN_RATES.join(','))}`)
+    apiGet(`/api/v1/quotes?symbols=${encodeURIComponent(MAIN_RATES.join(','))}`)
       .then((data) => {
         if (!cancelled) setQuotes((data && data.symbols) || {});
       })

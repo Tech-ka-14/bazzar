@@ -36,7 +36,7 @@ export default function Benchmarks() {
 
   useEffect(() => {
     let cancelled = false;
-    apiGet('/api/benchmarks')
+    apiGet('/api/v1/benchmarks')
       .then((data) => {
         if (cancelled) return;
         const byKey = {};
@@ -49,7 +49,7 @@ export default function Benchmarks() {
         console.error('Failed to load benchmarks', err);
         if (!cancelled) setBenchmarksError(err.message);
       });
-    apiGet('/api/macro')
+    apiGet('/api/v1/macro')
       .then((data) => {
         if (!cancelled) setMacro(Array.isArray(data) ? data : []);
       })

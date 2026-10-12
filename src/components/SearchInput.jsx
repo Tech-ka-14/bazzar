@@ -35,7 +35,7 @@ export default function SearchInput({
     debounceRef.current = setTimeout(async () => {
       const requestId = ++requestRef.current;
       try {
-        const data = await apiGet(`/api/search?q=${encodeURIComponent(q)}&limit=${limit}`);
+        const data = await apiGet(`/api/v1/search?q=${encodeURIComponent(q)}&limit=${limit}`);
         if (requestId !== requestRef.current) return; // stale response
         const items = Array.isArray(data) ? data : [];
         setResults(items);

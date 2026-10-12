@@ -39,7 +39,7 @@ export default function Commodities() {
   useEffect(() => {
     let cancelled = false;
     const symbols = [...new Set(Object.values(SYMBOL_MAP))].join(',');
-    apiGet(`/api/quotes?symbols=${encodeURIComponent(symbols)}`)
+    apiGet(`/api/v1/quotes?symbols=${encodeURIComponent(symbols)}`)
       .then((data) => {
         if (!cancelled) setQuotes((data && data.symbols) || {});
       })
