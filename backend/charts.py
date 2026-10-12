@@ -13,7 +13,11 @@ served by backend.server. No TradingView / lightweight-charts anywhere.
 from __future__ import annotations
 
 import datetime as dt
-from collections.abc import Iterable, Sequence
+import hashlib
+import json
+import re
+import threading
+from collections.abc import Callable, Iterable, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -57,6 +61,86 @@ def chart_cache_dir() -> Path:
     path = get_data_dir() / "charts"
     path.mkdir(parents=True, exist_ok=True)
     return path
+
+
+# --- cache-first chart store with manifest (P5, roadmap 5.4) -----------------
+#
+# Rendered PNGs live under ``<data dir>/cache/charts/<kind>/`` and are keyed by
+# ``<sanitised key>_<param hash>.png``. ``manifest.json`` maps each file name
+# (relative to the cache root) to the *data fingerprint* it was rendered from
+# plus its creation time. A cached PNG is served only when the fingerprint of
+# the current data matches — so a new sync always invalidates, and an unchanged
+# dataset never re-renders. The matplotlib generation path itself is unchanged.
+
+_cache_lock = threading.Lock()
+
+
+def _sanitize_name(name: str) -> str:
+    return re.sub(r"[^A-Za-z0-9_.-]+", "_", name)
+
+
+def _chart_store_root() -> Path:
+    root = get_data_dir() / "cache" / "charts"
+    root.mkdir(parents=True, exist_ok=True)
+    return root
+
+
+def _manifest_path() -> Path:
+    return _chart_store_root() / "manifest.json"
+
+
+def _load_manifest() -> dict[str, Any]:
+    try:
+        return json.loads(_manifest_path().read_text(encoding="utf-8"))
+    except Exception:  # missing or corrupt manifest — rebuild from scratch
+        return {}
+
+
+def _save_manifest(manifest: dict[str, Any]) -> None:
+    _manifest_path().write_text(json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8")
+
+
+def cached_chart_png(
+    kind: str,
+    key: str,
+    params: dict[str, Any],
+    fingerprint: str,
+    render: Callable[[Path], Any],
+) -> Path:
+    """Resolve a chart PNG cache-first.
+
+    kind:     chart family ("index" | "stock" | "benchmark").
+    key:      symbol / benchmark group key.
+    params:   request parameters that affect the render (e.g. exchange);
+              mixed into the file name hash so different params never share
+              a cache entry.
+    fingerprint: short string describing the data the chart is rendered from
+              (e.g. "87:2026-10-09:24105.15"); a cache hit requires an exact
+              match, so fresh data always triggers a re-render.
+    render:   callback writing the PNG to the given path when regeneration
+              is needed (return value ignored).
+    """
+    param_hash = hashlib.sha256(
+        json.dumps(params, sort_keys=True, default=str).encode()
+    ).hexdigest()[:10]
+    rel = f"{_sanitize_name(kind)}/{_sanitize_name(key)}_{param_hash}.png"
+    with _cache_lock:
+        out = _chart_store_root() / rel
+        manifest = _load_manifest()
+        entry = manifest.get(rel)
+        if entry and entry.get("fingerprint") == fingerprint and out.exists():
+            return out
+        out.parent.mkdir(parents=True, exist_ok=True)
+        render(out)
+        manifest[rel] = {
+            "kind": kind,
+            "key": key,
+            "params": params,
+            "fingerprint": fingerprint,
+            "created_at": dt.datetime.now(dt.UTC).isoformat(),
+        }
+        _save_manifest(manifest)
+        return out
 
 
 def _as_date(value: Any) -> dt.date:
