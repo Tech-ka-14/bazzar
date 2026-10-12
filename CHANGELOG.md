@@ -33,6 +33,33 @@ versioning: [SemVer](https://semver.org/).
 - Settings: `fred_api_key` (FRED_API_KEY) and `ogd_api_key` (OGD_API_KEY,
   reserved for P4-B) — non-secret public keys, .env only (see .env.example).
 
+### Added (P4-B — MoSPI/OGD + NSE open-data fetchers)
+- **MoSPI via data.gov.in OGD** (`backend/sources/mospi.py`, roadmap 4.2):
+  `GET https://api.data.gov.in/resource/{resource_id}?api-key={OGD_API_KEY}`
+  for `cpi_inflation` (monthly) and `wpi_inflation` (monthly) into
+  `macro_observations`. Resource IDs, field mappings and period formats
+  live in `db_config.json -> sources.ogd.resources` (no magic IDs in code);
+  the whole sync is skipped cleanly when `OGD_API_KEY` is unset, and
+  `iip`/`gdp_growth` ship with empty resource IDs plus documented gap
+  notes (no live OGD series — skipped with a log line, never fabricated).
+  Tolerant pure period parser: "Jan 2025", "2025-01", "01/2025",
+  "Q1 2024-25" → monthly `YYYY-MM` / quarterly `YYYY-Qn` labels.
+- **NSE open data** (`backend/sources/nse_open.py`, roadmap 4.3): market
+  holidays from `api/holiday-master?type=trading` upserted into
+  `trading_calendar` via the new `backend.calendar.upsert_trading_days`
+  helper (Muhurat special sessions stay trading days, matching the seeded
+  calendar); FII/DII daily flows from `api/fiidiiTradeReact` into the new
+  `fii_dii` benchmark group (`fii_net` / `dii_net`, ₹ crore); index
+  constituents from `api/equity-stockIndices` cached under
+  `BAZZAR_DATA_DIR/cache/nse/` (6h TTL, stale-cache fallback, `[]` on
+  failure — a data-access helper for future UI, no DB table). Cookie
+  bootstrap against `www.nseindia.com` with one 401/403 re-auth retry,
+  TokenBucket + tenacity on 429/5xx.
+- Both syncs run inside `ingestion_run` (`mospi_macro` / `nse_open`) with
+  per-series/per-dataset failure → partial status; tests run fully offline
+  on sanitized recorded fixtures (OGD monthly/quarterly payloads,
+  holiday-master, fiidiiTradeReact, equity-stockIndices).
+
 ## [1.5.0] - 2026-09-07
 
 ### Added (P3 — Kite Connect integration)
