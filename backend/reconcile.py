@@ -150,9 +150,7 @@ def check_kite_vs_bhavcopy(
     def rec(target: str, severity: str, message: str, **kwargs: Any) -> None:
         rows.append(record_check(con, CHECK_KITE_BHAVCOPY, target, severity, message, **kwargs))
 
-    latest_row = con.execute(
-        "SELECT MAX(date) FROM daily_ohlcv WHERE exchange = 'NSE'"
-    ).fetchone()
+    latest_row = con.execute("SELECT MAX(date) FROM daily_ohlcv WHERE exchange = 'NSE'").fetchone()
     latest = latest_row[0] if latest_row else None
     if latest is None:
         rec("-", SEVERITY_INFO, "no NSE bars stored — nothing to reconcile")
@@ -248,8 +246,7 @@ def check_kite_vs_bhavcopy(
             rec(
                 symbol,
                 SEVERITY_FAIL,
-                f"close differs from bhavcopy by {diff_pct:.4f}% (>2x tolerance"
-                f" {tolerance_pct}%)",
+                f"close differs from bhavcopy by {diff_pct:.4f}% (>2x tolerance {tolerance_pct}%)",
                 period=period,
                 details=details,
             )
