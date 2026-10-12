@@ -76,12 +76,23 @@ Installer behavior:
 - `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`
 - Renderer talks to the main process only through the narrow, context-isolated
   `window.bazzar` preload API:
+  - `getApiToken()` — per-launch bearer token for the local API (P5)
   - `getAppInfo()` — app/version/repository-payload information
   - `scraperStart/Pause/Resume/Cancel/GetStatus/Analyze` + `onScraperStatus`
     — scraper test-bench control and status pushes
   - `checkForUpdates()` — update-notification check
+  - `openExternal(url)` — allowlisted https URLs only (Kite login)
 - A Content-Security-Policy is set in `index.html`; new windows and external
   navigation are denied in the main process.
+- **Local API hardening (P5):** the FastAPI sidecar binds `127.0.0.1` only,
+  so it is never reachable off-machine. At every launch the main process
+  generates a random 32-byte hex bearer token, hands it to the sidecar via
+  `BAZZAR_API_TOKEN`, and the renderer attaches it as
+  `Authorization: Bearer <token>` on every request — other local processes
+  (and web pages) cannot read your market data. CORS is locked to the Vite
+  dev origins plus the `"null"` origin of packaged `file://` pages. Running
+  `python -m backend.server` directly without `BAZZAR_API_TOKEN` keeps the
+  API open as a documented development fallback.
 
 ## Scraper test-bench
 
