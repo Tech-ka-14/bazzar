@@ -3,6 +3,36 @@
 All notable changes to Bazzar Terminal. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 versioning: [SemVer](https://semver.org/).
 
+## [1.6.0] - 2026-10-12
+
+### Added (P4-A — government / open-data source fetchers)
+- **RBI DBIE source** (`backend/sources/rbi.py`): fetches Indian benchmark
+  series from the RBI Database on Indian Economy gateway
+  (`POST https://data.rbi.org.in/CIMS_Gateway_DBIE/GATEWAY/SERVICES/<service>`,
+  guest bearer via `security_generateSessionToken`, HTML-entity-encoded JSON
+  responses). G-Sec 10Y/5Y yields (`YIELD_GOV_SEC_RN`, sliced by residual
+  maturity) and 91-day T-Bill yield (`YIELD_TB_RN`, 15–91 days) into
+  `benchmark_observations`; weekly forex reserves (`FR_EXG_RESV_RN`, total,
+  US$ million → USD bn) into `macro_observations`. Series codes, dimensions
+  and parameters live in `db_config.json -> sources.rbi` (no magic IDs in
+  code). Policy rates (repo / reverse repo / CRR / `rbi_repo`) are config-
+  ready but skipped with a log line: DBIE carries them only in the
+  "Key Rates" indicators report (id 531) behind the BOE OpenDocument
+  guest-token chain — a documented P4 follow-up, never fabricated.
+- **International benchmarks** (`backend/sources/intl.py`): US Treasury
+  daily par yield curve CSV (tolerant of the legacy `10 Yr` and current
+  `BC_10YEAR` column names) → `us_10y`; FRED `FEDFUNDS` → `us_fed_funds`
+  (skipped with a clear log line when `FRED_API_KEY` is unset).
+- **Benchmark upsert helper** (`backend/benchmarks.py`):
+  `upsert_benchmark_observation` — idempotent ON CONFLICT upsert with
+  series-key validation against `benchmark_series` (mirrors
+  `backend.macro.upsert_observation`).
+- Both syncs run inside `ingestion_run` (`rbi_macro` / `intl_benchmarks`)
+  with per-series failure → partial status; HTTP via injectable sessions,
+  TokenBucket rate limiting and tenacity backoff on 429/5xx.
+- Settings: `fred_api_key` (FRED_API_KEY) and `ogd_api_key` (OGD_API_KEY,
+  reserved for P4-B) — non-secret public keys, .env only (see .env.example).
+
 ## [1.5.0] - 2026-09-07
 
 ### Added (P3 — Kite Connect integration)

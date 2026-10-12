@@ -51,6 +51,21 @@ class Settings(BaseSettings):
     broker_api_key: str = Field(default="")
     broker_api_secret: str = Field(default="")
 
+    # --- open-data source API keys (P4; non-secret public keys, .env only) --
+    fred_api_key: str = Field(
+        default="",
+        description="FRED API key (env FRED_API_KEY) for the us_fed_funds "
+        "benchmark. Free, non-secret public key from "
+        "https://fred.stlouisfed.org/docs/api/api_key.html — .env only, never "
+        "committed. When unset the FRED sync is skipped (never fabricated).",
+    )
+    ogd_api_key: str = Field(
+        default="",
+        description="Open Government Data (data.gov.in) API key (env "
+        "OGD_API_KEY), used by the P4-B OGD fetchers. Free public key from "
+        "https://data.gov.in/user — .env only, never committed.",
+    )
+
     # --- observability -----------------------------------------------------
     log_level: str = Field(default="INFO")
 
@@ -60,7 +75,7 @@ class Settings(BaseSettings):
 
     @property
     def log_dir(self) -> Path:
-        return self.bazzar_data_dir / "logs"
+        return self.b_dir / "logs"
 
     @property
     def chart_cache_dir(self) -> Path:
