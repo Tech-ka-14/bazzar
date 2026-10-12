@@ -192,6 +192,86 @@ def health() -> dict[str, Any]:
     return {"ok": ok, "db": str(db_path), "version": VERSION}
 
 
+@app.get("/api/health/data")
+def health_data() -> dict[str, Any]:
+    """Data-quality status from the ``data_quality`` audit table (P4-C).
+
+    Returns the latest row per (check_name, target) plus severity counts.
+    Status: "red" when any unresolved fail-severity row is younger than 48h,
+    "amber" when a fail is older than 48h or any warn-severity row is
+    current, else "green". An empty/never-checked table is green with empty
+    checks — never a 500, never a fabricated status.
+    """
+    import datetime as dt
+    import json
+
+    cutoff = dt.datetime.now(dt.UTC).replace(tzinfo=None) - dt.timedelta(hours=48)
+    with db() as con:
+        try:
+            rows = con.execute(
+                """
+                SELECT check_name, target, period, severity, message, details, created_at
+                FROM data_quality
+                QUALIFY ROW_NUMBER() OVER (
+                    PARTITION BY check_name, target ORDER BY id DESC
+                ) = 1
+                ORDER BY check_name, target
+                """
+            ).fetchall()
+        except Exception:  # table missing (pre-migration db) — green/empty
+            rows = []
+
+    checks = []
+    summary = {"info": 0, "warn": 0, "fail": 0}
+    recent_fail = False
+    stale_fail = False
+    warn = False
+    for check_name, target, period, severity, message, details, created_at in rows:
+        if severity in summary:
+            summary[severity] += 1
+        created = (
+            created_at
+            if isinstance(created_at, dt.datetime)
+            else dt.datetime.fromisoformat(str(created_at))
+        )
+        if severity == "fail":
+            if created >= cutoff:
+                recent_fail = True
+            else:
+                stale_fail = True
+        elif severity == "warn":
+            warn = True
+        parsed_details: Any = details
+        if isinstance(details, str):
+            try:
+                parsed_details = json.loads(details)
+            except ValueError:
+                parsed_details = details
+        checks.append(
+            {
+                "check_name": check_name,
+                "target": target,
+                "period": period,
+                "severity": severity,
+                "message": message,
+                "details": parsed_details,
+                "created_at": created.isoformat(),
+            }
+        )
+
+    status = "green"
+    if warn or stale_fail:
+        status = "amber"
+    if recent_fail:
+        status = "red"
+    return {
+        "status": status,
+        "checks": checks,
+        "summary": summary,
+        "asOf": dt.datetime.now(dt.UTC).isoformat(),
+    }
+
+
 @app.get("/api/meta/ingestion")
 def meta_ingestion() -> dict[str, Any]:
     """Ingestion audit: per-job freshness (asOf) + recent runs (P2).
