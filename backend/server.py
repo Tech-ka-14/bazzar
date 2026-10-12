@@ -5,6 +5,16 @@ port overridable via BAZZAR_API_PORT). Run with:
 
     python3 -m backend.server
 
+P5 (roadmap 5.1–5.5) hardening:
+  * bearer-token auth on /api/* when BAZZAR_API_TOKEN is set (Electron
+    passes a per-launch token; unset = documented dev fallback)
+  * CORS locked to the Vite dev origins (+ "null" for packaged file://)
+  * single error envelope, X-Request-ID on every response
+  * routes live under /api/v1, with a deprecated /api alias for one release
+  * pydantic response models (backend/schemas.py), gzip, weak ETags,
+    manifest-cached chart PNGs, a concurrency semaphore on chart rendering
+  * /api/health (liveness) vs /api/health/ready (readiness)
+
 CRITICAL: numbers are never fabricated. When a table has no data yet,
 endpoints return null fields / empty lists so the UI can show an
 "awaiting data sync" state; chart.png endpoints return a 404 JSON error.
@@ -12,28 +22,55 @@ endpoints return null fields / empty lists so the UI can show an
 
 from __future__ import annotations
 
+import asyncio
+import datetime as dt
+import json
 import os
 import re
 from contextlib import contextmanager
+from http import HTTPStatus
 from typing import Any
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import APIRouter, FastAPI, HTTPException, Query, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.responses import FileResponse, JSONResponse
+from starlette.concurrency import run_in_threadpool
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from .charts import chart_cache_dir, render_candles_png, render_line_png
-from .db import get_connection, get_db_path, initialize_database, load_config
+from . import schemas
+from .charts import cached_chart_png, render_candles_png, render_line_png
+from .db import get_connection, get_data_dir, get_db_path, initialize_database, load_config
 from .fetch_indices import ensure_snapshot_view
+from .middleware import (
+    BearerAuthMiddleware,
+    RequestIDMiddleware,
+    WeakETagMiddleware,
+    error_envelope,
+)
+from .settings import get_settings
 
-VERSION = "1.5.0"
+VERSION = "1.7.0"
 
 app = FastAPI(title="Bazzar Terminal Data API", version=VERSION)
+
+# Middleware stack (added innermost → outermost). Request path:
+#   CORS → X-Request-ID → bearer auth → weak ETag → gzip → route
+# CORS is outermost so unauthenticated preflight (OPTIONS) still answers.
+app.add_middleware(GZipMiddleware, minimum_size=1024)
+app.add_middleware(WeakETagMiddleware)
+app.add_middleware(BearerAuthMiddleware)
+app.add_middleware(RequestIDMiddleware)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # local desktop app
+    # Vite dev server origins; "null" is the Origin sent by the packaged
+    # Electron renderer (file:// pages) — a loopback desktop app has no
+    # meaningful web origin, and the bearer token is the real gate.
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "null"],
     allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST"],
+    allow_headers=["Authorization", "Content-Type", "If-None-Match"],
 )
 
 
@@ -42,6 +79,81 @@ def _startup() -> None:
     initialize_database()
     with db() as con:
         ensure_snapshot_view(con)
+    app.state.chart_semaphore = asyncio.Semaphore(get_settings().bazzar_api_concurrency)
+
+
+@app.on_event("shutdown")
+def _shutdown() -> None:
+    """Graceful shutdown: DuckDB connections are per-request (opened and
+    closed inside each endpoint), so there is no long-lived handle to close;
+    log the transition so sidecar logs show a clean SIGTERM/SIGINT story."""
+    from .logging_config import get_logger
+
+    get_logger("backend.server").info("server shutdown complete", version=VERSION)
+
+
+def _chart_semaphore() -> asyncio.Semaphore:
+    """Concurrency cap for chart rendering (default 4; BAZZAR_API_CONCURRENCY)."""
+    sem = getattr(app.state, "chart_semaphore", None)
+    if sem is None:  # startup not run (direct TestClient use) — create lazily
+        sem = asyncio.Semaphore(get_settings().bazzar_api_concurrency)
+        app.state.chart_semaphore = sem
+    return sem
+
+
+# --- error envelope (P5, roadmap 5.3) ----------------------------------------
+
+
+def _status_code_name(status_code: int) -> str:
+    try:
+        phrase = HTTPStatus(status_code).phrase
+    except ValueError:
+        return "http_error"
+    return re.sub(r"_+", "_", re.sub(r"[^a-z0-9]+", "_", phrase.lower())).strip("_")
+
+
+@app.exception_handler(StarletteHTTPException)
+async def _http_exception_handler(request: Request, exc: StarletteHTTPException) -> JSONResponse:
+    detail: Any = exc.detail
+    message = detail if isinstance(detail, str) and detail else _status_code_name(exc.status_code)
+    return JSONResponse(
+        status_code=exc.status_code,
+        content=error_envelope(_status_code_name(exc.status_code), message),
+        headers=getattr(exc, "headers", None),
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def _validation_exception_handler(
+    request: Request, exc: RequestValidationError
+) -> JSONResponse:
+    errors = exc.errors()
+    message = "request validation failed"
+    if errors:
+        first = errors[0]
+        loc = ".".join(str(part) for part in first.get("loc", []))
+        message = f"request validation failed ({loc}: {first.get('msg', 'invalid')})"
+    return JSONResponse(status_code=422, content=error_envelope("validation_error", message))
+
+
+@app.exception_handler(Exception)
+async def _unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Catch-all: log the traceback server-side, never leak internals."""
+    from .logging_config import get_logger
+
+    request_id = getattr(request.state, "request_id", "-")
+    get_logger("backend.server").error(
+        "unhandled exception",
+        error_type=exc.__class__.__name__,
+        request_id=request_id,
+        exc_info=exc,
+    )
+    return JSONResponse(
+        status_code=500,
+        content=error_envelope(
+            "internal_error", f"internal server error (request id {request_id})"
+        ),
+    )
 
 
 @contextmanager
@@ -117,18 +229,21 @@ def _latest_quote(con, symbol: str, exchange: str | None) -> dict[str, Any] | No
     return {"value": last["close"], "change": change, "changePct": change_pct, "asOf": last["date"]}
 
 
-def _sanitize(name: str) -> str:
-    return re.sub(r"[^A-Za-z0-9_.-]+", "_", name)
+def _bars_fingerprint(bars: list[dict[str, Any]]) -> str:
+    """Cache key component describing exactly the data a chart renders."""
+    last = bars[-1]
+    return f"{len(bars)}:{last['date']}:{last['close']}"
 
 
-# --- endpoints ---------------------------------------------------------------
+# --- endpoints (mounted at /api/v1, plus a deprecated /api alias) -------------
+
+router = APIRouter()
 
 
-@app.get("/api/auth/kite/login-url")
+@router.get("/auth/kite/login-url", response_model=schemas.KiteLoginUrl)
 def kite_login_url() -> dict[str, Any]:
     """The Zerodha redirect-login URL for the configured KITE_API_KEY (P3)."""
     from .providers.kite import login_url
-    from .settings import get_settings
 
     api_key = get_settings().kite_api_key
     if not api_key:
@@ -139,12 +254,16 @@ def kite_login_url() -> dict[str, Any]:
     return {"url": login_url(api_key)}
 
 
-@app.get("/api/auth/kite/callback")
+@router.get("/auth/kite/callback", response_model=schemas.KiteConnected)
 def kite_callback(request_token: str = Query(default="")) -> dict[str, Any]:
-    """Kite redirect target: exchanges request_token for a session (keyring)."""
+    """Kite redirect target: exchanges request_token for a session (keyring).
+
+    This path is exempt from the bearer-token middleware: the *external*
+    browser is redirected here by kite.trade after login and cannot know the
+    per-launch token; the one-time request_token is itself the credential.
+    """
     from . import kite_auth
     from .providers.base import ProviderError
-    from .settings import get_settings
 
     if not request_token:
         raise HTTPException(status_code=400, detail="missing request_token")
@@ -161,16 +280,15 @@ def kite_callback(request_token: str = Query(default="")) -> dict[str, Any]:
     return {"status": "connected", **meta}
 
 
-@app.get("/api/auth/kite/status")
+@router.get("/auth/kite/status", response_model=schemas.KiteAuthStatus)
 def kite_status() -> dict[str, Any]:
     """Non-secret Kite auth state for the UI (tokens never leave the keyring)."""
     from . import kite_auth
-    from .settings import get_settings
 
     return kite_auth.auth_status(get_settings().kite_api_key)
 
 
-@app.post("/api/auth/kite/disconnect")
+@router.post("/auth/kite/disconnect", response_model=schemas.StatusResponse)
 def kite_disconnect() -> dict[str, Any]:
     """Clear the Kite session from the keyring (the API secret is kept)."""
     from . import kite_auth
@@ -179,8 +297,9 @@ def kite_disconnect() -> dict[str, Any]:
     return {"status": "disconnected"}
 
 
-@app.get("/api/health")
+@router.get("/health", response_model=schemas.HealthResponse)
 def health() -> dict[str, Any]:
+    """Liveness: 200 whenever the process is serving (DB check best-effort)."""
     db_path = get_db_path()
     ok = db_path.exists()
     if ok:
@@ -192,7 +311,40 @@ def health() -> dict[str, Any]:
     return {"ok": ok, "db": str(db_path), "version": VERSION}
 
 
-@app.get("/api/health/data")
+@router.get("/health/ready", response_model=schemas.ReadyResponse)
+def health_ready() -> dict[str, Any]:
+    """Readiness: DuckDB opens, migrations are at latest, data dir writable.
+
+    200 {"status": "ready", ...} when all checks pass, else 503 in the
+    standard error envelope. Used by the Electron shell to know the sidecar
+    can actually serve data (vs merely being alive — see /health).
+    """
+    from .migrate import migration_status
+
+    problems: list[str] = []
+    data_dir = get_data_dir()
+    try:
+        data_dir.mkdir(parents=True, exist_ok=True)
+        probe = data_dir / ".ready-probe"
+        probe.write_text("ok", encoding="utf-8")
+        probe.unlink()
+    except Exception:
+        problems.append("data directory is not writable")
+    try:
+        with db() as con:
+            con.execute("SELECT 1")
+            pending = [m for m in migration_status(con) if not m["applied"]]
+            if pending:
+                names = ", ".join(str(m["name"]) for m in pending)
+                problems.append(f"schema migrations pending: {names}")
+    except Exception:
+        problems.append("DuckDB is not available")
+    if problems:
+        raise HTTPException(status_code=503, detail="not ready: " + "; ".join(problems))
+    return {"status": "ready", "db": str(get_db_path()), "version": VERSION}
+
+
+@router.get("/health/data", response_model=schemas.HealthDataResponse)
 def health_data() -> dict[str, Any]:
     """Data-quality status from the ``data_quality`` audit table (P4-C).
 
@@ -202,9 +354,6 @@ def health_data() -> dict[str, Any]:
     current, else "green". An empty/never-checked table is green with empty
     checks — never a 500, never a fabricated status.
     """
-    import datetime as dt
-    import json
-
     cutoff = dt.datetime.now(dt.UTC).replace(tzinfo=None) - dt.timedelta(hours=48)
     with db() as con:
         try:
@@ -272,7 +421,7 @@ def health_data() -> dict[str, Any]:
     }
 
 
-@app.get("/api/meta/ingestion")
+@router.get("/meta/ingestion")
 def meta_ingestion() -> dict[str, Any]:
     """Ingestion audit: per-job freshness (asOf) + recent runs (P2).
 
@@ -285,7 +434,7 @@ def meta_ingestion() -> dict[str, Any]:
         return {"freshness": data_freshness(con), "recent_runs": latest_runs(con, limit=20)}
 
 
-@app.get("/api/meta/rejects")
+@router.get("/meta/rejects")
 def meta_rejects(limit: int = Query(default=100, ge=1, le=1000)) -> list[dict[str, Any]]:
     """Rows quarantined by write validation (P2), newest first."""
     with db() as con:
@@ -307,7 +456,7 @@ def meta_rejects(limit: int = Query(default=100, ge=1, le=1000)) -> list[dict[st
     ]
 
 
-@app.get("/api/home/indices")
+@router.get("/home/indices", response_model=list[schemas.HomeIndex])
 def home_indices() -> list[dict[str, Any]]:
     config = load_config()
     out = []
@@ -327,7 +476,7 @@ def home_indices() -> list[dict[str, Any]]:
     return out
 
 
-@app.get("/api/indices")
+@router.get("/indices", response_model=list[schemas.IndexRow])
 def indices() -> list[dict[str, Any]]:
     with db() as con:
         try:
@@ -363,8 +512,7 @@ def indices() -> list[dict[str, Any]]:
     ]
 
 
-@app.get("/api/indices/{symbol}/chart.png")
-def index_chart(symbol: str) -> FileResponse:
+def _index_chart_data(symbol: str) -> tuple[str, list[dict[str, Any]]]:
     with db() as con:
         bars = _index_bars(con, symbol)
         if not bars:
@@ -373,31 +521,63 @@ def index_chart(symbol: str) -> FileResponse:
                 (symbol,),
             ).fetchone()
             if row:
-                bars = _index_bars(con, row[0])
                 symbol = row[0]
+                bars = _index_bars(con, symbol)
+    return symbol, bars
+
+
+@router.get("/indices/{symbol}/chart.png")
+async def index_chart(symbol: str) -> FileResponse:
+    resolved, bars = await run_in_threadpool(_index_chart_data, symbol)
     if not bars:
         raise HTTPException(status_code=404, detail=f"no daily data synced for index '{symbol}'")
-    out = chart_cache_dir() / f"index_{_sanitize(symbol)}.png"
-    render_candles_png(bars, f"{symbol} — daily", str(out))
+    fingerprint = _bars_fingerprint(bars)
+    title = f"{resolved} — daily"
+    async with _chart_semaphore():
+        out = await run_in_threadpool(
+            lambda: cached_chart_png(
+                "index",
+                resolved,
+                {},
+                fingerprint,
+                lambda path: render_candles_png(bars, title, str(path)),
+            )
+        )
     return FileResponse(str(out), media_type="image/png")
 
 
-@app.get("/api/stocks/{symbol}/chart.png")
-def stock_chart(symbol: str, exchange: str = Query(default="NSE")) -> FileResponse:
+def _stock_chart_data(symbol: str, exchange: str | None) -> list[dict[str, Any]]:
     with db() as con:
         bars = _stock_bars(con, symbol, exchange)
         if not bars:
             bars = _stock_bars(con, symbol, None)
+    return bars
+
+
+@router.get("/stocks/{symbol}/chart.png")
+async def stock_chart(symbol: str, exchange: str = Query(default="NSE")) -> FileResponse:
+    bars = await run_in_threadpool(_stock_chart_data, symbol, exchange)
     if not bars:
         raise HTTPException(
             status_code=404, detail=f"no daily data synced for stock '{symbol}' ({exchange})"
         )
-    out = chart_cache_dir() / f"stock_{_sanitize(exchange)}_{_sanitize(symbol)}.png"
-    render_candles_png(bars, f"{symbol} ({exchange}) — daily", str(out))
+    fingerprint = _bars_fingerprint(bars)
+    title = f"{symbol} ({exchange}) — daily"
+    params = {"exchange": exchange}
+    async with _chart_semaphore():
+        out = await run_in_threadpool(
+            lambda: cached_chart_png(
+                "stock",
+                symbol,
+                params,
+                fingerprint,
+                lambda path: render_candles_png(bars, title, str(path)),
+            )
+        )
     return FileResponse(str(out), media_type="image/png")
 
 
-@app.get("/api/search")
+@router.get("/search", response_model=list[schemas.SearchResult])
 def search(
     q: str = Query(default=""), limit: int = Query(default=10, ge=1, le=100)
 ) -> list[dict[str, Any]]:
@@ -435,7 +615,7 @@ def search(
     return [{"symbol": s, "name": n, "exchange": e} for _, s, n, e in scored[:limit]]
 
 
-@app.get("/api/quotes")
+@router.get("/quotes", response_model=schemas.QuotesResponse)
 def quotes(symbols: str = Query(default="")) -> dict[str, Any]:
     requested = [s.strip() for s in symbols.split(",") if s.strip()]
     result: dict[str, Any] = {}
@@ -452,7 +632,7 @@ def quotes(symbols: str = Query(default="")) -> dict[str, Any]:
     return {"symbols": result}
 
 
-@app.get("/api/benchmarks")
+@router.get("/benchmarks", response_model=schemas.BenchmarksResponse)
 def benchmarks() -> dict[str, Any]:
     config = load_config()
     groups = []
@@ -482,8 +662,7 @@ def benchmarks() -> dict[str, Any]:
     return {"groups": groups}
 
 
-@app.get("/api/benchmarks/{key}/chart.png")
-def benchmark_chart(key: str) -> FileResponse:
+def _benchmark_chart_data(key: str) -> tuple[dict[str, Any], list, list[str]]:
     config = load_config()
     group = next((g for g in config["benchmarks"] if g["key"] == key), None)
     if group is None:
@@ -499,14 +678,32 @@ def benchmark_chart(key: str) -> FileResponse:
             if rows:
                 series_points.append([(str(r[0])[:10], r[1]) for r in rows])
                 labels.append(series["name"])
+    return group, series_points, labels
+
+
+@router.get("/benchmarks/{key}/chart.png")
+async def benchmark_chart(key: str) -> FileResponse:
+    group, series_points, labels = await run_in_threadpool(_benchmark_chart_data, key)
     if not series_points:
         raise HTTPException(status_code=404, detail=f"no observations synced for benchmark '{key}'")
-    out = chart_cache_dir() / f"benchmark_{_sanitize(key)}.png"
-    render_line_png(series_points, group["title"], group["unit"], str(out), series_labels=labels)
+    fingerprint = json.dumps([[len(s), s[-1]] for s in series_points], default=str)
+    title, unit = group["title"], group["unit"]
+    async with _chart_semaphore():
+        out = await run_in_threadpool(
+            lambda: cached_chart_png(
+                "benchmark",
+                key,
+                {},
+                fingerprint,
+                lambda path: render_line_png(
+                    series_points, title, unit, str(path), series_labels=labels
+                ),
+            )
+        )
     return FileResponse(str(out), media_type="image/png")
 
 
-@app.get("/api/macro")
+@router.get("/macro", response_model=list[schemas.MacroSeriesItem])
 def macro() -> list[dict[str, Any]]:
     with db() as con:
         rows = con.execute(
@@ -544,10 +741,18 @@ def macro() -> list[dict[str, Any]]:
     return out
 
 
+# Current versioned mount + one-release backward-compat alias (P5, roadmap
+# 5.3): the renderer calls /api/v1; the /api alias stays (undocumented in the
+# OpenAPI schema) until the next release so older shells keep working.
+app.include_router(router, prefix="/api/v1")
+app.include_router(router, prefix="/api", include_in_schema=False)
+
+
 def main() -> None:
     import uvicorn
 
     port = int(os.environ.get("BAZZAR_API_PORT", "8787"))
+    # Loopback-only bind: the sidecar must never be reachable off-machine.
     uvicorn.run(app, host="127.0.0.1", port=port, log_level="info")
 
 
