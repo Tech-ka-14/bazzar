@@ -5,9 +5,12 @@
 ```
 Electron shell (electron/)                — secure desktop wrapper, NSIS installer
   └─ React renderer (src/)                — Vite + React 18 + Tailwind, black/gold theme
-        │  HTTP/JSON + PNG over 127.0.0.1:8787
+        │  HTTP/JSON + PNG over 127.0.0.1:8787 (loopback only)
+        │  Authorization: Bearer <per-launch token> (P5)
         ▼
 FastAPI sidecar (backend/server.py)       — local-only API, never fabricates numbers
+  ├─ backend/middleware.py                — bearer auth, X-Request-ID, weak ETags (P5)
+  ├─ backend/schemas.py                   — pydantic response models = API contract (P5)
   ├─ backend/db.py + db_config.json       — DuckDB, config-driven bootstrap (runs migrations)
   ├─ backend/migrate.py + migrations/     — versioned schema (schema_migrations, NNNN_*.sql)
   ├─ backend/validation.py                — write-path OHLCV validation → data_rejects quarantine
@@ -53,10 +56,14 @@ archive/                                  — legacy sources, reference only, ne
    skipped rather than guessed.
 3. Macro/benchmark observations land in `macro_observations` /
    `benchmark_observations` (registry: `backend/db_config.json`).
-4. The renderer calls the FastAPI sidecar for JSON lists and PNG charts.
-   Unsynced data returns `null` fields — the UI shows "awaiting data sync".
-   `/api/meta/ingestion` reports per-job freshness (`data_as_of`) and
-   `/api/meta/rejects` exposes the quarantine.
+4. The renderer calls the FastAPI sidecar for JSON lists and PNG charts
+   (all under `/api/v1`, bearer token attached by `src/api.js`; chart PNGs
+   are fetched as authenticated blobs and rendered via object URLs since
+   `<img>` cannot send headers). Unsynced data returns `null` fields — the
+   UI shows "awaiting data sync". `/api/v1/meta/ingestion` reports per-job
+   freshness (`data_as_of`) and `/api/v1/meta/rejects` exposes the
+   quarantine. `/api/v1/health` is liveness, `/api/v1/health/ready` checks
+   DuckDB + migrations + data-dir writability (503 when unready).
 5. `python -m backend.backup create` snapshots the whole database to
    timestamped parquet under `data/backups/` (retention: last 14 daily +
    12 monthly), `restore` imports a snapshot into a fresh file.
@@ -85,6 +92,9 @@ archive/                                  — legacy sources, reference only, ne
 5. **All renderer data via the API** (`src/api.js`); no mock data in `src/`.
 6. Electron: `contextIsolation`, `sandbox`, no `nodeIntegration`, narrow
    preload IPC only.
+7. The sidecar binds `127.0.0.1` and, when the Electron shell launches it,
+   requires the per-launch `BAZZAR_API_TOKEN` bearer token on every
+   `/api/*` call (unset = open dev fallback) — P5.
 
 ## Repo map
 
@@ -104,5 +114,5 @@ archive/                                  — legacy sources, reference only, ne
 
 v2.0 execution follows `BAZZAR_ROADMAP.md` (P0 repo hygiene + P1 tooling in
 1.3.0; P2 data-layer hardening in 1.4.0; P3 Kite Connect in 1.5.0 — live
-quotes via KiteTicker (3.5) deliberately deferred; P4 gov-data ingestion
-next).
+quotes via KiteTicker (3.5) deliberately deferred; P4 gov-data ingestion in
+1.6.0; P5 API hardening in 1.7.0).

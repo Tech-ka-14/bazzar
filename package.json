@@ -1,7 +1,7 @@
 {
   "name": "bazzar-terminal",
   "productName": "Bazzar Terminal",
-  "version": "1.5.0",
+  "version": "1.7.0",
   "description": "Bazzar Terminal - Windows desktop financial terminal built from the Bazzar repository",
   "author": "Bazzar",
   "license": "MIT",
