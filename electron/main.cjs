@@ -3,6 +3,7 @@
 // narrow, context-isolated preload API to the renderer.
 //
 // Main-process services:
+//  - get-api-token       per-launch bearer token for the FastAPI sidecar (P5)
 //  - app:get-info        app/version/repository-payload information
 //  - scraper:*           safe test-bench scraper (offline sample mode works
 //                        without network; optional URL mode fetches CSV/JSON)
@@ -13,12 +14,22 @@
 //                        (P3: Kite Connect login — kite.trade only)
 const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const { spawn } = require('child_process');
+const crypto = require('crypto');
 const path = require('path');
 const fs = require('fs');
 const http = require('http');
 const https = require('https');
 
 const isDev = !!process.env.VITE_DEV_SERVER_URL;
+
+// ---------------------------------------------------------------------------
+// Sidecar API token (P5, roadmap 5.1)
+// A random 32-byte hex token is generated per launch and handed to the
+// FastAPI sidecar via BAZZAR_API_TOKEN; the renderer fetches it over the
+// 'get-api-token' IPC and sends it as `Authorization: Bearer <token>` on
+// every API call. The token never touches disk and dies with the process.
+// ---------------------------------------------------------------------------
+const apiToken = crypto.randomBytes(32).toString('hex');
 
 // ---------------------------------------------------------------------------
 // Repository payload info
@@ -629,11 +640,13 @@ async function checkForUpdates() {
 
 // ---------------------------------------------------------------------------
 // Python data-backend sidecar (DuckDB + FastAPI; see backend/ and SPEC v1.2.0)
-// The sidecar serves the local market-data API (default http://127.0.0.1:8787)
-// and matplotlib-rendered charts. It is best-effort: if Python or the backend
-// package is unavailable the renderer simply shows its "awaiting data sync"
-// states. Set BAZZAR_BACKEND=0 to disable, BAZZAR_PYTHON to override the
-// interpreter.
+// The sidecar serves the local market-data API (default http://127.0.0.1:8787,
+// loopback only) and matplotlib-rendered charts. It is best-effort: if Python
+// or the backend package is unavailable the renderer simply shows its
+// "awaiting data sync" states. Set BAZZAR_BACKEND=0 to disable, BAZZAR_PYTHON
+// to override the interpreter. The child receives BAZZAR_API_TOKEN (the
+// per-launch bearer token above) and is SIGTERM'd (SIGKILL after a grace
+// period) when the app quits.
 // ---------------------------------------------------------------------------
 
 let backendProcess = null;
@@ -666,6 +679,7 @@ function startBackendSidecar() {
       cwd,
       stdio: 'ignore',
       windowsHide: true,
+      env: { ...process.env, BAZZAR_API_TOKEN: apiToken },
     });
     backendProcess.on('exit', () => {
       backendProcess = null;
@@ -678,14 +692,29 @@ function startBackendSidecar() {
   }
 }
 
+// Graceful sidecar shutdown (P5, roadmap 5.5): SIGTERM first so FastAPI can
+// run its shutdown handlers (DuckDB connections are per-request and already
+// closed), then SIGKILL if the child is still alive after the grace period.
+const SIDECAR_KILL_GRACE_MS = 3000;
+
 function stopBackendSidecar() {
-  if (!backendProcess) return;
-  try {
-    backendProcess.kill();
-  } catch {
-    /* already gone */
-  }
+  const child = backendProcess;
+  if (!child) return;
   backendProcess = null;
+  try {
+    child.kill('SIGTERM');
+  } catch {
+    return; /* already gone */
+  }
+  const forceKill = setTimeout(() => {
+    try {
+      child.kill('SIGKILL');
+    } catch {
+      /* exited in the meantime */
+    }
+  }, SIDECAR_KILL_GRACE_MS);
+  if (typeof forceKill.unref === 'function') forceKill.unref();
+  child.once('exit', () => clearTimeout(forceKill));
 }
 
 // ---------------------------------------------------------------------------
@@ -727,6 +756,10 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  // Per-launch sidecar bearer token (P5) — registered before any window
+  // loads so the renderer can attach it to API requests from the start.
+  ipcMain.handle('get-api-token', () => apiToken);
+
   // Narrow IPC surface: app/version/repository-payload information.
   ipcMain.handle('app:get-info', () => ({
     name: app.getName(),
