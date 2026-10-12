@@ -1,0 +1,29 @@
+{
+  "index_name": "cpi_inflation",
+  "status": "ok",
+  "title": "All-India CPI headline retail inflation (sanitized fixture; structure mirrors api.data.gov.in/resource/9d67b242-0243-4298-adf9-7617dbeba7ab)",
+  "total": 4,
+  "count": 4,
+  "records": [
+    {
+      "period": "Jan 2026",
+      "inflation_rate": "4.31"
+    },
+    {
+      "period": "Feb 2026",
+      "inflation_rate": "3.87"
+    },
+    {
+      "period": "Mar 2026",
+      "inflation_rate": "N/A"
+    },
+    {
+      "period": "not-a-period",
+      "inflation_rate": "5.00"
+    },
+    {
+      "period": "2026-04",
+      "inflation_rate": 3.55
+    }
+  ]
+}

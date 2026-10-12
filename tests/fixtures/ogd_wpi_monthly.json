@@ -1,0 +1,25 @@
+{
+  "index_name": "wpi_inflation",
+  "status": "ok",
+  "title": "Wholesale Price Index, base 2011-12 (sanitized fixture; structure mirrors api.data.gov.in/resource/239ac3d0-f08d-40d0-b03c-9b7a426a62d5)",
+  "total": 4,
+  "count": 4,
+  "records": [
+    {
+      "month": "2026-01",
+      "wpi_inflation": "1.84"
+    },
+    {
+      "month": "02/2026",
+      "wpi_inflation": "2.13"
+    },
+    {
+      "month": "2026-03",
+      "wpi_inflation": "-"
+    },
+    {
+      "month": "04-2026",
+      "wpi_inflation": "2.05"
+    }
+  ]
+}

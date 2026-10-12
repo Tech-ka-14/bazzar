@@ -1,4 +1,4 @@
-"""Government / open-data source fetchers (P4-A, roadmap steps 4.1 + 4.4).
+"""Government / open-data source fetchers (P4, roadmap steps 4.1–4.4).
 
 Each source module pairs a pure parser (offline-testable against recorded
 fixtures under tests/fixtures/) with a small HTTP client class (injectable

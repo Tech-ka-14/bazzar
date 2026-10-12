@@ -1,0 +1,49 @@
+{
+  "name": "NIFTY 50",
+  "advance": { "declines": "20", "advances": "28", "unchanged": "2" },
+  "timestamp": "12-Oct-2026 16:00",
+  "metadata": {
+    "indexName": "NIFTY 50",
+    "open": 24410.5,
+    "high": 24512.3,
+    "low": 24355.1,
+    "previousClose": 24400.0,
+    "last": 24490.75
+  },
+  "data": [
+    {
+      "priority": 1,
+      "symbol": "NIFTY 50",
+      "identifier": "NIFTY 50",
+      "open": 24410.5,
+      "lastPrice": 24490.75,
+      "meta": null
+    },
+    {
+      "priority": 0,
+      "symbol": "RELIANCE",
+      "identifier": "RELIANCEEQN",
+      "open": 2987.5,
+      "lastPrice": 3001.2,
+      "ffmc": "10.12",
+      "meta": { "companyName": "Reliance Industries Limited", "industry": "OIL & GAS", "isin": "INE002A01018" }
+    },
+    {
+      "priority": 0,
+      "symbol": "HDFCBANK",
+      "identifier": "HDFCBANKEQN",
+      "open": 1712.0,
+      "lastPrice": 1720.45,
+      "ffmc": "9.87",
+      "meta": { "companyName": "HDFC Bank Limited", "industry": "PRIVATE BANKS", "isin": "INE040A01034" }
+    },
+    {
+      "priority": 0,
+      "symbol": "TCS",
+      "identifier": "TCSEQN",
+      "open": 4112.3,
+      "lastPrice": 4101.9,
+      "meta": { "companyName": "Tata Consultancy Services Limited", "industry": "IT", "isin": "INE467B01029" }
+    }
+  ]
+}

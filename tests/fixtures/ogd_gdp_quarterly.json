@@ -1,0 +1,25 @@
+{
+  "index_name": "gdp_growth",
+  "status": "ok",
+  "title": "Quarterly GDP growth (sanitized fixture; no live OGD resource exists — fixture exercises the quarterly parser only)",
+  "total": 4,
+  "count": 4,
+  "records": [
+    {
+      "period": "Q1 2025-26",
+      "value": "7.8"
+    },
+    {
+      "period": "Q2 2025-26",
+      "value": "8.2"
+    },
+    {
+      "period": "2025-Q3",
+      "value": "8.4"
+    },
+    {
+      "period": "FY 2025",
+      "value": "6.5"
+    }
+  ]
+}

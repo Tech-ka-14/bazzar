@@ -62,6 +62,32 @@ def seed_trading_calendar(
     return len(rows)
 
 
+def upsert_trading_days(
+    con: duckdb.DuckDBPyConnection,
+    rows: list[tuple[str, str, bool, str | None]],
+) -> int:
+    """Idempotently upsert calendar rows; returns the row count.
+
+    Each row is ``(date, exchange, is_trading, description)`` with ``date``
+    an ISO date string (YYYY-MM-DD) and ``description`` the holiday/session
+    name (or None). Used by the NSE holiday-master sync (P4-B) to layer
+    official exchange holidays onto the seeded calendar.
+    """
+    rows = [
+        (str(date), str(exchange), bool(is_trading), description or None)
+        for date, exchange, is_trading, description in rows
+    ]
+    con.executemany(
+        "INSERT INTO trading_calendar (date, exchange, is_trading_day, holiday_name)"
+        " VALUES (?, ?, ?, ?)"
+        " ON CONFLICT (exchange, date) DO UPDATE SET"
+        " is_trading_day = excluded.is_trading_day,"
+        " holiday_name = excluded.holiday_name",
+        rows,
+    )
+    return len(rows)
+
+
 def is_trading_day(
     con: duckdb.DuckDBPyConnection,
     day: dt.date | str,
