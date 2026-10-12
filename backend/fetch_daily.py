@@ -1,15 +1,22 @@
 """Daily OHLCV puller for all active securities.
 
 Rate-limit policy (db_config.json -> fetch_policy):
-  * daily timeframe only (interval "D" is hardcoded in the client)
+  * daily timeframe only (interval "D" is hardcoded in the providers)
   * symbols processed in STRICT alphabetical order
   * after each symbol completes, fetch_checkpoint (job="daily_equity") is
     upserted with that symbol; an interrupted run resumes at the symbol
     after the checkpoint
-  * weekends/holidays need no calendar — the API simply returns no rows
+  * weekends/holidays need no calendar — providers simply return no rows
+
+Provider selection (P3): ``--provider {kite,openalgo,nse_bhavcopy}`` or the
+MARKET_DATA_PROVIDER setting (default openalgo). Per-symbol failures skip the
+symbol, advance the checkpoint, and mark the run "partial"; an auth failure
+(``ProviderAuthRequired``) aborts the whole run — re-authenticate, then rerun
+(the checkpoint resumes where it stopped).
 
 CLI:
     python3 -m backend.fetch_daily [--start YYYY-MM-DD] [--end YYYY-MM-DD]
+                                   [--provider kite|openalgo|nse_bhavcopy]
 """
 
 from __future__ import annotations
@@ -20,7 +27,8 @@ import sys
 
 from .db import get_connection, initialize_database, load_config
 from .ingestion import ingestion_run
-from .openalgo_client import CredentialsNotConfigured, OpenAlgoClient, normalize_history
+from .providers import PROVIDERS, ProviderAuthRequired, ProviderError, get_provider
+from .providers.openalgo import CredentialsNotConfigured
 from .validation import upsert_daily_ohlcv
 
 JOB = "daily_equity"
@@ -61,7 +69,7 @@ def pending_symbols(con, job: str) -> list[tuple[str, str]]:
     return rows
 
 
-def run(start: str, end: str) -> int:
+def run(start: str, end: str, provider_name: str | None = None) -> int:
     initialize_database()
     config = load_config()
     checkpoint_table = config["fetch_policy"]["checkpoint_table"]
@@ -69,25 +77,33 @@ def run(start: str, end: str) -> int:
     con = get_connection()
     try:
         todo = pending_symbols(con, JOB)
+        provider = get_provider(provider_name, con=con)
     finally:
         con.close()
     if not todo:
         print("No active securities to fetch (securities table empty or fully synced).")
         return 0
 
-    client = OpenAlgoClient()
     print(
-        f"Fetching daily OHLCV for {len(todo)} securities ({start} -> {end}),"
-        f" strict alphabetical order, interval 'D'."
+        f"Fetching daily OHLCV for {len(todo)} securities ({start} -> {end})"
+        f" via provider '{provider.name}', strict alphabetical order, daily only."
     )
     con = get_connection()
     total = 0
     total_rejected = 0
+    failed: list[str] = []
     try:
         with ingestion_run(con, JOB) as run:
             for symbol, exchange in todo:
-                payload = client.history(symbol, exchange, start, end)
-                bars = normalize_history(payload)
+                try:
+                    bars = provider.history_daily(symbol, exchange, start, end)
+                except ProviderAuthRequired:
+                    raise  # abort the run — re-authenticate, checkpoint stays put
+                except Exception as exc:  # per-symbol failure: skip, keep going
+                    failed.append(f"{symbol} ({exc.__class__.__name__})")
+                    print(f"  {symbol} ({exchange}): FAILED — {exc}; skipping")
+                    set_checkpoint(con, JOB, symbol)
+                    continue
                 written, rejected = upsert_daily_ohlcv(
                     con, job=JOB, symbol=symbol, exchange=exchange, bars=bars
                 )
@@ -97,11 +113,14 @@ def run(start: str, end: str) -> int:
                 total += written
                 total_rejected += rejected
                 print(f"  {symbol} ({exchange}): {written} daily bars, {rejected} rejected")
+            if failed:
+                run.error = f"{len(failed)} symbol(s) failed: {', '.join(failed[:20])}"
     finally:
         con.close()
     print(
-        f"Done. {total} bars upserted across {len(todo)} symbols"
-        f" ({total_rejected} rows quarantined in data_rejects)."
+        f"Done. {total} bars upserted across {len(todo) - len(failed)} symbols"
+        f" ({total_rejected} rows quarantined in data_rejects"
+        f"{f', {len(failed)} symbol(s) failed' if failed else ''})."
     )
     return 0
 
@@ -118,14 +137,28 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--end", default=dt.date.today().isoformat(), help="end date YYYY-MM-DD (default: today)"
     )
+    parser.add_argument(
+        "--provider",
+        choices=PROVIDERS,
+        default=None,
+        help="market-data provider (default: MARKET_DATA_PROVIDER setting, 'openalgo')",
+    )
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
-        return run(args.start, args.end)
+        return run(args.start, args.end, provider_name=args.provider)
     except CredentialsNotConfigured as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    except ProviderAuthRequired as exc:
+        print(
+            f"error: {exc}\nRe-authenticate, then rerun — the checkpoint resumes.", file=sys.stderr
+        )
+        return 3
+    except ProviderError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
 

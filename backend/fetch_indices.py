@@ -5,6 +5,11 @@ processed in alphabetical order (index_master.sort_order is assigned
 alphabetically), and fetch_checkpoint records the last completed symbol so an
 interrupted run resumes at the next one.
 
+Provider selection (P3) matches fetch_daily: ``--provider`` or the
+MARKET_DATA_PROVIDER setting. Kite resolves index instrument tokens from the
+securities table (run `python -m backend.sync_instruments --provider kite`
+first — index instruments are stored under the *_INDEX exchange labels).
+
 Also maintains the `index_snapshot` helper view, which computes per index:
 latest daily OHLC (as of the most recent date in index_daily) plus the
 52-week (year) high/low = MAX(high)/MIN(low) over the trailing 1-year window.
@@ -12,6 +17,7 @@ The API server reads this view for /api/indices (yearHigh/yearLow).
 
 CLI:
     python3 -m backend.fetch_indices [--start YYYY-MM-DD] [--end YYYY-MM-DD]
+                                     [--provider kite|openalgo|nse_bhavcopy]
 """
 
 from __future__ import annotations
@@ -23,7 +29,8 @@ import sys
 from .db import get_connection, initialize_database
 from .fetch_daily import default_start, get_checkpoint, set_checkpoint
 from .ingestion import ingestion_run
-from .openalgo_client import CredentialsNotConfigured, OpenAlgoClient, normalize_history
+from .providers import PROVIDERS, ProviderAuthRequired, ProviderError, get_provider
+from .providers.openalgo import CredentialsNotConfigured
 from .validation import upsert_index_daily
 
 JOB = "daily_indices"
@@ -80,31 +87,39 @@ def upsert_index_bars(con, symbol: str, bars: list[dict]) -> int:
     return written
 
 
-def run(start: str, end: str) -> int:
+def run(start: str, end: str, provider_name: str | None = None) -> int:
     initialize_database()
     con = get_connection()
     try:
         ensure_snapshot_view(con)
         todo = pending_indices(con, JOB)
+        provider = get_provider(provider_name, con=con)
     finally:
         con.close()
     if not todo:
         print("No active indices to fetch.")
         return 0
 
-    client = OpenAlgoClient()
     print(
-        f"Fetching daily OHLC for {len(todo)} indices ({start} -> {end}),"
-        f" alphabetical via sort_order, interval 'D'."
+        f"Fetching daily OHLC for {len(todo)} indices ({start} -> {end})"
+        f" via provider '{provider.name}', alphabetical via sort_order, daily only."
     )
     con = get_connection()
     total = 0
     total_rejected = 0
+    failed: list[str] = []
     try:
         with ingestion_run(con, JOB) as run:
             for symbol, exchange in todo:
-                payload = client.history(symbol, exchange, start, end)
-                bars = normalize_history(payload)
+                try:
+                    bars = provider.history_daily(symbol, exchange, start, end)
+                except ProviderAuthRequired:
+                    raise  # abort the run — re-authenticate, checkpoint stays put
+                except Exception as exc:  # per-symbol failure: skip, keep going
+                    failed.append(f"{symbol} ({exc.__class__.__name__})")
+                    print(f"  {symbol} ({exchange}): FAILED — {exc}; skipping")
+                    set_checkpoint(con, JOB, symbol)
+                    continue
                 written, rejected = upsert_index_daily(
                     con, job=JOB, symbol=symbol, exchange=exchange, bars=bars
                 )
@@ -114,11 +129,13 @@ def run(start: str, end: str) -> int:
                 total += written
                 total_rejected += rejected
                 print(f"  {symbol} ({exchange}): {written} daily bars, {rejected} rejected")
+            if failed:
+                run.error = f"{len(failed)} index symbol(s) failed: {', '.join(failed[:20])}"
         ensure_snapshot_view(con)
     finally:
         con.close()
     print(
-        f"Done. {total} bars upserted across {len(todo)} indices"
+        f"Done. {total} bars upserted across {len(todo) - len(failed)} indices"
         f" ({total_rejected} rows quarantined); index_snapshot view refreshed."
     )
     return 0
@@ -137,14 +154,28 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--end", default=dt.date.today().isoformat(), help="end date YYYY-MM-DD (default: today)"
     )
+    parser.add_argument(
+        "--provider",
+        choices=PROVIDERS,
+        default=None,
+        help="market-data provider (default: MARKET_DATA_PROVIDER setting, 'openalgo')",
+    )
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
-        return run(args.start, args.end)
+        return run(args.start, args.end, provider_name=args.provider)
     except CredentialsNotConfigured as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    except ProviderAuthRequired as exc:
+        print(
+            f"error: {exc}\nRe-authenticate, then rerun — the checkpoint resumes.", file=sys.stderr
+        )
+        return 3
+    except ProviderError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
 
