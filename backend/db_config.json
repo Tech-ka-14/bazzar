@@ -736,7 +736,7 @@
       "symbol": "NIFTY COMMODITIES",
       "name": "NIFTY COMMODITIES",
       "exchange": "NSE_INDEX",
-      "category": "commodity",
+      "category": "sectoral",
       "sort_order": 70
     },
     {
