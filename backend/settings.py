@@ -35,6 +35,21 @@ class Settings(BaseSettings):
     )
     bazzar_api_port: int = Field(default=8787, ge=1, le=65535)
     bazzar_api_host: str = Field(default="127.0.0.1")
+    bazzar_api_token: str = Field(
+        default="",
+        description="Localhost bearer token (env BAZZAR_API_TOKEN) required on "
+        "every /api/* request when set. The Electron main process generates a "
+        "random 32-byte hex token per launch and passes it here; when unset "
+        "(plain `python -m backend.server` dev run) the API is open — "
+        "documented development fallback.",
+    )
+    bazzar_api_concurrency: int = Field(
+        default=4,
+        ge=1,
+        le=64,
+        description="Max concurrent heavy endpoint jobs (chart rendering) so "
+        "the sidecar event loop stays responsive.",
+    )
 
     # --- market data provider (P3: kite is primary; openalgo fallback) -----
     market_data_provider: str = Field(
