@@ -97,11 +97,23 @@ interfaces exactly.
 - `fetch_indices.py` — daily OHLC + 52-week high/low for every index in
   `index_master`; same `--provider` semantics.
 - `macro.py` — macro indicator registry loader + observation import helpers.
+- `reconcile.py` — data-quality checks (P4-C): kite-vs-bhavcopy close
+  reconciliation, macro/benchmark freshness vs configured cadence; results
+  are appended to the `data_quality` table inside an `ingestion_run` audit
+  context. CLI `python3 -m backend.reconcile` (exit 1 on fail-severity).
+- `sources/` — government/open-data fetchers (P4): `rbi.py`, `intl.py`,
+  `mospi.py`, `nse_open.py`, plus `sync_all.py` (one-command seed:
+  all sources + reconcile; missing keys/offline = clean skips, exit 1 only
+  on hard failures).
 - `charts.py` — matplotlib candlestick/line PNG renderers.
 - `server.py` — FastAPI app (uvicorn, port `BAZZAR_API_PORT`, default 8787).
 
 ## Local HTTP API contract (base `http://127.0.0.1:8787`)
 - `GET /api/health` → `{ok, db, version}`
+- `GET /api/health/data` → `{status, checks, summary, asOf}` — data-quality
+  status from `data_quality` (P4-C): latest row per (check_name, target);
+  `red` on an unresolved fail younger than 48h, `amber` on any current warn
+  or older unresolved fail, else `green`; empty table → green, never 500
 - `GET /api/home/indices` → `[{name, symbol, value, change, changePct, asOf}]`
   (value = current/last close, change = pointwise change, changePct = %)
 - `GET /api/indices` → `[{symbol, name, exchange, open, high, low, close,

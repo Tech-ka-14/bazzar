@@ -60,6 +60,39 @@ versioning: [SemVer](https://semver.org/).
   on sanitized recorded fixtures (OGD monthly/quarterly payloads,
   holiday-master, fiidiiTradeReact, equity-stockIndices).
 
+### Added (P4-C — reconciliation & data quality, roadmap 4.5)
+- **`data_quality` table** (migration `0004_data_quality.sql`): append-only
+  audit of every check result — `(check_name, target, period, severity
+  ('info'|'warn'|'fail'), message, details JSON, created_at)`. Owned by
+  migrations (sequence + default), same pattern as the P2 ops tables.
+- **Reconciliation checks** (`backend/reconcile.py`):
+  `check_kite_vs_bhavcopy` samples up to 10 stored NSE closes from the
+  latest stored trading day and compares them against the official NSE
+  bhavcopy (provider injectable; >0.5% diff → warn, >2× → fail, missing
+  either side → info "no data to compare"); `check_macro_freshness` flags
+  stale `macro_observations` per the series' configured `frequency`
+  (tolerances are documented constants; never-synced → info);
+  `check_benchmark_freshness` does the same for `benchmark_observations`
+  per group cadence (daily groups ~7d, monthly `repo_rates` 45d).
+  `run_all` executes every check inside an `ingestion_run(con,
+  "reconcile")` (fail-severity findings → partial run) and returns a
+  `{checks_run, info, warn, fail, status}` summary. CLI:
+  `python3 -m backend.reconcile` (exit 1 on any fail-severity finding).
+- **One-command seed CLI** (`backend/sources/sync_all.py`):
+  `python3 -m backend.sources.sync_all` runs RBI → intl benchmarks (FRED
+  skipped without a key) → MoSPI/OGD (skipped without a key) → NSE open →
+  `reconcile.run_all`, prints a per-source status table plus the
+  data-quality summary, and exits 1 only on hard failures — missing keys /
+  offline sources are clean skips, never crashes.
+- **`GET /api/health/data`**: `{status, checks, summary, asOf}` — latest
+  `data_quality` row per (check_name, target); `red` when an unresolved
+  fail is younger than 48h, `amber` on any current warn or older unresolved
+  fail, else `green`; empty table → green with empty checks (never a 500).
+- **Tests**: 30 new tests — reconcile checks with a fake bhavcopy provider,
+  macro/benchmark freshness per frequency, run_all audit + CLI exit codes,
+  sync_all offline fail-soft behaviour, and the health endpoint matrix
+  (empty/warn/recent-fail/old-fail/resolved).
+
 ## [1.5.0] - 2026-09-07
 
 ### Added (P3 — Kite Connect integration)
