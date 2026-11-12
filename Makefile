@@ -43,7 +43,7 @@ audit: ## Dependency vulnerability audit (pip-audit + npm audit; P6)
 secrets: ## Secret scan: gitleaks when installed, detect-secrets fallback (P6)
 	@if command -v gitleaks >/dev/null 2>&1; then \
 		gitleaks detect --source . --config .gitleaks.toml --verbose; \
-		else \
+	else \
 		echo "gitleaks not found; using detect-secrets baseline"; \
 		detect-secrets scan --all-files --baseline .secrets.baseline \
 			--exclude-files 'node_modules|dist|data/|\.pytest_cache|\.mypy_cache|\.ruff_cache|\.secrets\.baseline'; \
