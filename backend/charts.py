@@ -76,7 +76,18 @@ _cache_lock = threading.Lock()
 
 
 def _sanitize_name(name: str) -> str:
-    return re.sub(r"[^A-Za-z0-9_.-]+", "_", name)
+    """Map an arbitrary string to a safe single path component (P6 hardened).
+
+    Allowlist ``[A-Za-z0-9_.-]``; everything else (``/``, ``\\``, unicode
+    lookalikes, NUL, ...) collapses to ``_``. A result consisting only of
+    dots (``.``, ``..``, ``...``) is a directory reference, not a file name,
+    and collapses to ``_`` too. Callers may therefore join the result into a
+    cache path without a traversal check.
+    """
+    safe = re.sub(r"[^A-Za-z0-9_.-]+", "_", name)
+    if safe.strip(".") == "":
+        return "_"
+    return safe
 
 
 def _chart_store_root() -> Path:
