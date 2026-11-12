@@ -1,7 +1,7 @@
 {
   "name": "bazzar-terminal",
   "productName": "Bazzar Terminal",
-  "version": "1.7.0",
+  "version": "1.8.0",
   "description": "Bazzar Terminal - Windows desktop financial terminal built from the Bazzar repository",
   "author": "Bazzar",
   "license": "MIT",
@@ -24,12 +24,14 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
+    "audit": "npm audit --audit-level=high",
     "check": "npm run lint && npm run format:check && npm run test && npm run build"
   },
   "dependencies": {
     "lucide-react": "^0.454.0",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.3",

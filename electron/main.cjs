@@ -12,8 +12,13 @@
 //                        manifest at BAZZAR_UPDATE_MANIFEST_URL)
 //  - shell:open-external open an allowlisted https URL in the system browser
 //                        (P3: Kite Connect login — kite.trade only)
-const { app, BrowserWindow, ipcMain, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, session, shell } = require('electron');
 const { spawn } = require('child_process');
+const {
+  validateExternalUrl,
+  validateScraperAnalyze,
+  validateScraperStart,
+} = require('./validation.cjs');
 const crypto = require('crypto');
 const path = require('path');
 const fs = require('fs');
@@ -432,7 +437,7 @@ function mulberry32(seed) {
     a |= 0;
     a = (a + 0x6d2b79f5) | 0;
     let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    t = (t + Math.imul(t ^ (t >>> 7), 61 ^ t)) ^ t;
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
@@ -743,7 +748,10 @@ function createWindow() {
   // Harden navigation: deny new windows and external navigation by default.
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   win.webContents.on('will-navigate', (event, url) => {
-    if (!isDev && !url.startsWith('file://')) {
+    const allowed = isDev
+      ? url.startsWith(process.env.VITE_DEV_SERVER_URL || 'http://localhost:5173')
+      : url.startsWith('file://');
+    if (!allowed) {
       event.preventDefault();
     }
   });
@@ -756,6 +764,15 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  // Permission gate (P6, roadmap 6.3): the renderer never needs camera,
+  // microphone, geolocation, notifications, clipboard-read, etc. Deny every
+  // permission request and log the attempt so abuse is visible.
+  session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback) => {
+    console.warn(`[security] denied renderer permission request: ${permission}`);
+    callback(false);
+  });
+  session.defaultSession.setPermissionCheckHandler(() => false);
+
   // Per-launch sidecar bearer token (P5) — registered before any window
   // loads so the renderer can attach it to API requests from the start.
   ipcMain.handle('get-api-token', () => apiToken);
@@ -772,13 +789,18 @@ app.whenReady().then(() => {
     repository: getRepositoryInfo(),
   }));
 
-  // Scraper test-bench IPC.
+  // Scraper test-bench IPC. Payloads are validated against zod schemas
+  // (electron/validation.cjs) before touching any state (P6, roadmap 6.3).
   ipcMain.handle('scraper:start', (_event, options) => {
     if (scraperState.status === 'running' || scraperState.status === 'paused') {
       return scraperSnapshot();
     }
-    const mode = options?.mode === 'url' ? 'url' : 'sample';
-    const url = typeof options?.url === 'string' ? options.url.trim() : '';
+    const check = validateScraperStart(options);
+    if (!check.ok) {
+      return { ...scraperSnapshot(), error: check.error };
+    }
+    const mode = check.value.mode === 'url' ? 'url' : 'sample';
+    const url = check.value.url || '';
     scraperState.status = 'running';
     scraperState.mode = mode;
     scraperState.progress = { processed: 0, total: 0 };
@@ -811,28 +833,27 @@ app.whenReady().then(() => {
     return scraperSnapshot();
   });
   ipcMain.handle('scraper:status', () => scraperSnapshot());
-  ipcMain.handle('scraper:analyze', (_event, options) =>
-    analyzeScraperOutput(typeof options?.path === 'string' ? options.path : null)
-  );
+  ipcMain.handle('scraper:analyze', (_event, options) => {
+    const check = validateScraperAnalyze(options);
+    if (!check.ok) {
+      return { ok: false, error: check.error, path: null };
+    }
+    return analyzeScraperOutput(check.path);
+  });
 
   // Update notification IPC.
   ipcMain.handle('update:check', () => checkForUpdates());
 
   // Open an allowlisted https URL in the system browser (P3: Kite Connect
   // redirect login). New windows stay denied, so the renderer asks the main
-  // process; anything outside the allowlist or not https is refused.
-  const ALLOWED_EXTERNAL_HOSTS = new Set(['kite.trade', 'developers.kite.trade']);
+  // process; anything outside the allowlist or not https is refused. The
+  // payload is schema-validated in electron/validation.cjs (P6).
   ipcMain.handle('shell:open-external', (_event, url) => {
-    let parsed;
-    try {
-      parsed = new URL(typeof url === 'string' ? url : '');
-    } catch {
-      return { ok: false, error: 'Invalid URL' };
+    const check = validateExternalUrl(url);
+    if (!check.ok) {
+      return { ok: false, error: check.error };
     }
-    if (parsed.protocol !== 'https:' || !ALLOWED_EXTERNAL_HOSTS.has(parsed.hostname)) {
-      return { ok: false, error: 'URL not allowed' };
-    }
-    shell.openExternal(parsed.toString());
+    shell.openExternal(check.url);
     return { ok: true };
   });
 

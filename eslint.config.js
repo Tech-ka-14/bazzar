@@ -39,7 +39,7 @@ export default [
     },
   },
   {
-    files: ['src/__tests__/**/*.{js,jsx}'],
+    files: ['src/__tests__/**/*.{js,jsx}', 'electron/__tests__/**/*.js'],
     languageOptions: {
       globals: { ...globals.node },
     },
