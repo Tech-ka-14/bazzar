@@ -3,6 +3,56 @@
 All notable changes to Bazzar Terminal. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 versioning: [SemVer](https://semver.org/).
 
+## [1.8.0] - 2026-10-12
+
+### Added (P6 — security pass, roadmap 6.1–6.5)
+- **Secrets audit (6.1):** `.env.example` verified to document only
+  non-secret values with empty placeholders, with comments pointing at the
+  keyring CLI (`python -m backend.kite_auth set-secret`). New `.gitleaks.toml`
+  (default rules + placeholder/doc allowlists) backing the existing gitleaks
+  pre-commit hook; `detect-secrets` added to `requirements-dev.txt` as the
+  pip-installable fallback with a committed `.secrets.baseline` (4 audited
+  false positives: key-name constants + fake test keys). Both scans run over
+  the working tree with **zero findings**. A combined CI workflow
+  (gitleaks + pip-audit + npm audit) is staged at `docs/ci/security.yml` —
+  copy into `.github/workflows/` to activate (`docs/ci/README.md`).
+- **Dependency security (6.2):** new `make audit` target (pip-audit +
+  `npm audit --audit-level=high`); `pip-audit` and `detect-secrets` added to
+  dev requirements; Dependabot config staged at `docs/ci/dependabot.yml`
+  (pip + npm + github-actions, weekly). zod is introduced at the patched
+  `^4.6.7`. Remaining advisories (autobahn via kiteconnect's hard pin —
+  unreachable WebSocket-ticker path; electron/electron-builder/vite/vitest
+  dev-only tooling) are documented with justification in
+  `SECURITY.md` → "Dependency audit exceptions".
+- **Electron hardening (6.3):** `setPermissionRequestHandler` denies **all**
+  renderer permission requests (and logs the attempt) plus a deny-all
+  `setPermissionCheckHandler`; `will-navigate` now allowlists only the Vite
+  dev origin in dev mode. New `electron/validation.cjs` holds zod schemas for
+  every `ipcMain.handle` payload — `scraper:start`, `scraper:analyze`, and
+  the https + host-allowlisted `shell:open-external` — with unit tests in
+  `electron/__tests__/validation.test.js` (vitest). Already-present
+  protections kept and verified: `contextIsolation`, `sandbox`, no
+  `nodeIntegration`, explicit `webSecurity: true`, CSP, denied window-open,
+  denied off-origin navigation.
+- **Input & DB safety (6.4):** `backend/backup.py` no longer interpolates
+  raw values into SQL — `EXPORT/IMPORT DATABASE` paths (parser-level
+  literals that cannot take bind parameters) are escaped through the new
+  `_sql_string_literal()`, and per-table row counts use the DuckDB relation
+  API. `backend/sync_instruments.py`'s dynamic `NOT IN (...)` placeholder
+  list is now pure bind parameters (paired `unnest(?::VARCHAR[])`).
+  `backend/charts._sanitize_name()` additionally collapses all-dot results
+  (`.`, `..`, `...`) so a sanitized name can never be a directory reference.
+  New AST-based gate `tests/test_sql_safety.py` fails the suite on any
+  f-string SQL with raw interpolation; `tests/test_path_traversal.py` pins
+  traversal rejection (`../`, absolute paths, unicode lookalikes, NUL,
+  percent-encoding) on the sanitizer, the cache store, and the chart
+  endpoints.
+- **Docs (6.5):** new `SECURITY.md` (threat model, token lifecycle, keyring
+  story, dependency-audit process + exceptions, data-at-rest guidance,
+  hardening checklist). SPEC.md gains binding security rules (DB safety, IPC
+  validation, secrets inventory, audit gate); README's Security section
+  points at both.
+
 ## [1.7.0] - 2026-10-12
 
 ### Added (P5 — backend API hardening, roadmap 5.1–5.5)
