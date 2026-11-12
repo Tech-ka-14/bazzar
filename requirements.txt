@@ -13,7 +13,7 @@ matplotlib>=3.8
 requests>=2.31
 
 # Configuration & resilience (P1)
-pydantic>=2.7
+pydantic>=2.13.5
 pydantic-settings>=2.3
 structlog>=24.1
 tenacity>=8.3
