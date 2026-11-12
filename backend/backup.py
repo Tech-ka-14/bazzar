@@ -33,6 +33,19 @@ RETAIN_DAILY = 14
 RETAIN_MONTHLY = 12
 
 
+def _sql_string_literal(value: str) -> str:
+    """Escape a value as a DuckDB SQL string literal.
+
+    ``EXPORT DATABASE`` / ``IMPORT DATABASE`` do not accept bind parameters
+    (parser-level literal), so the path has to be interpolated. Single quotes
+    are doubled per the SQL standard, which is the complete escape rule for
+    DuckDB string literals. The AST-based SQL-safety test
+    (``tests/test_sql_safety.py``) only tolerates f-string SQL whose
+    interpolated values go through this helper.
+    """
+    return "'" + value.replace("'", "''") + "'"
+
+
 def backups_root() -> Path:
     return get_data_dir() / "backups"
 
@@ -87,7 +100,7 @@ def create_backup(con: duckdb.DuckDBPyConnection | None = None) -> Path:
     root.mkdir(parents=True, exist_ok=True)
     target = root / dt.datetime.now().strftime("%Y%m%d_%H%M%S")
     try:
-        con.execute(f"EXPORT DATABASE '{target}' (FORMAT PARQUET)")
+        con.execute(f"EXPORT DATABASE {_sql_string_literal(str(target))} (FORMAT PARQUET)")
         con.execute("CHECKPOINT")
     finally:
         if own:
@@ -108,7 +121,7 @@ def restore_backup(snapshot_dir: str | Path, db_path: str | Path) -> dict[str, i
     db_path.parent.mkdir(parents=True, exist_ok=True)
     con = duckdb.connect(str(db_path))
     try:
-        con.execute(f"IMPORT DATABASE '{snapshot}'")
+        con.execute(f"IMPORT DATABASE {_sql_string_literal(str(snapshot))}")
         tables = [
             r[0]
             for r in con.execute(
@@ -117,7 +130,9 @@ def restore_backup(snapshot_dir: str | Path, db_path: str | Path) -> dict[str, i
             ).fetchall()
         ]
         counts = {
-            t: con.execute(f'SELECT COUNT(*) FROM "{t}"').fetchone()[0]  # type: ignore[index]
+            # Relation API: identifiers cannot be bind parameters, and the
+            # relation builder quotes them safely.
+            t: con.table(t).count("*").fetchall()[0][0]
             for t in tables
         }
     finally:
@@ -140,10 +155,7 @@ def table_counts(con: duckdb.DuckDBPyConnection | None = None) -> dict[str, int]
                 " WHERE table_schema = 'main' ORDER BY table_name"
             ).fetchall()
         ]
-        return {
-            t: con.execute(f'SELECT COUNT(*) FROM "{t}"').fetchone()[0]  # type: ignore[index]
-            for t in tables
-        }
+        return {t: con.table(t).count("*").fetchall()[0][0] for t in tables}
     finally:
         if own:
             con.close()

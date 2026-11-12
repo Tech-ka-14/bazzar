@@ -95,13 +95,18 @@ def sync_instruments(
         # Deactivate (never delete) instruments that vanished from the master.
         deactivated = 0
         if seen:
-            placeholders = ", ".join(["(?, ?)"] * len(seen))
-            flat = [v for pair in seen for v in pair]
+            # Bind parameters only (P6 DB-safety rule): the (symbol, exchange)
+            # pairs are passed as two arrays and unnested in the query instead
+            # of interpolating a dynamic placeholder list.
+            seen_symbols = [symbol for symbol, _ in seen]
+            seen_exchanges = [exchange for _, exchange in seen]
             result = con.execute(
                 "UPDATE securities SET active = FALSE"
                 " WHERE active AND instrument_token IS NOT NULL"
-                f" AND (symbol, exchange) NOT IN ({placeholders})",
-                flat,
+                " AND (symbol, exchange) NOT IN ("
+                "SELECT s, e FROM ("
+                "SELECT unnest(?::VARCHAR[]) AS s, unnest(?::VARCHAR[]) AS e))",
+                [seen_symbols, seen_exchanges],
             ).fetchone()
             deactivated = int(result[0]) if result else 0
         run.rows_written = written
