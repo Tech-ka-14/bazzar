@@ -1,0 +1,62 @@
+# Bazzar Terminal — security CI gate (P6, roadmap 6.1/6.2).
+#
+# *** THIS FILE IS STAGED, NOT ACTIVE ***
+# Copy it to .github/workflows/security.yml to activate it (the automation
+# that produced this change cannot push under .github/). See docs/ci/README.md.
+#
+# Three gates, all matching the local `make audit` / `make secrets` targets:
+#   1. gitleaks  — secret scan of the working tree + history
+#   2. pip-audit — Python dependency vulnerabilities (requirements*.txt)
+#   3. npm audit — Node dependency vulnerabilities (--audit-level=high)
+#
+# Documented exceptions (SECURITY.md "Dependency audit exceptions") fail the
+# job only when NEW advisories appear beyond the accepted list; keep the
+# allowlist in sync with SECURITY.md.
+
+name: security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # Weekly sweep so newly published CVEs are caught even without commits.
+    - cron: '0 6 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  gitleaks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history for the secret scan
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITLEAKS_CONFIG: .gitleaks.toml
+          GITLEAKS_ENABLE_COMMENTS: 'false'
+
+  pip-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt -r requirements-dev.txt
+      # Audits the fully resolved environment. The accepted-exception list
+      # (autobahn via kiteconnect) is documented in SECURITY.md; treat a
+      # non-zero exit as a signal to update either the pins or the list.
+      - run: pip-audit
+
+  npm-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm install
+      - run: npm audit --audit-level=high

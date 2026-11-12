@@ -11,3 +11,8 @@ mypy>=1.11
 
 # Git hooks
 pre-commit>=3.8
+
+# Security (P6): dependency audit + secret-scan fallback (gitleaks is the
+# primary scanner via pre-commit; detect-secrets runs anywhere pip does)
+pip-audit>=2.7
+detect-secrets>=1.5

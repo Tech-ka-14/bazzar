@@ -1,0 +1,44 @@
+# Bazzar Terminal — Dependabot config (P6, roadmap 6.2).
+#
+# *** THIS FILE IS STAGED, NOT ACTIVE ***
+# Copy it to .github/dependabot.yml to activate it (the automation that
+# produced this change cannot push under .github/). See docs/ci/README.md.
+
+version: 2
+updates:
+  # Python backend + tooling (requirements.txt / requirements-dev.txt).
+  - package-ecosystem: 'pip'
+    directory: '/'
+    schedule:
+      interval: 'weekly'
+    open-pull-requests-limit: 5
+    groups:
+      python-minor:
+        update-types: ['minor', 'patch']
+
+  # Electron shell + renderer (package.json).
+  - package-ecosystem: 'npm'
+    directory: '/'
+    schedule:
+      interval: 'weekly'
+    open-pull-requests-limit: 5
+    groups:
+      npm-minor:
+        update-types: ['minor', 'patch']
+    # Major upgrades of electron / electron-builder / vite / vitest are
+    # intentionally manual (see SECURITY.md "Dependency audit exceptions").
+    ignore:
+      - dependency-name: 'electron'
+        update-types: ['version-update:semver-major']
+      - dependency-name: 'electron-builder'
+        update-types: ['version-update:semver-major']
+      - dependency-name: 'vite'
+        update-types: ['version-update:semver-major']
+      - dependency-name: 'vitest'
+        update-types: ['version-update:semver-major']
+
+  # GitHub Actions pinned in workflow files.
+  - package-ecosystem: 'github-actions'
+    directory: '/'
+    schedule:
+      interval: 'weekly'

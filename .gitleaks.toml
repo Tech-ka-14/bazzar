@@ -1,0 +1,43 @@
+# Gitleaks configuration for Bazzar Terminal (P6, roadmap 6.1).
+#
+# Run locally:   gitleaks detect --source . --config .gitleaks.toml --verbose
+# Pre-commit:    the gitleaks hook in .pre-commit-config.yaml picks this file
+#                up automatically (it looks for .gitleaks.toml at the root).
+# CI:            docs/ci/security.yml runs the same scan (copy it into
+#                .github/workflows/ to activate).
+#
+# Pip fallback when the gitleaks binary is unavailable:
+#   detect-secrets scan --all-files
+# (installed via requirements-dev.txt; see Makefile `secrets` target).
+
+title = "Bazzar Terminal gitleaks config"
+
+# Start from gitleaks' built-in default rule set, then narrow what follows.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Global allowlist: placeholder/example values and docs"
+paths = [
+  # Empty placeholders only — real values live in .env (gitignored).
+  '''^\.env\.example$''',
+  # Documentation describes where secrets live; it never contains real ones.
+  '''^docs/''',
+  '''^SECURITY\.md$''',
+  '''^SPEC\.md$''',
+  '''^README\.md$''',
+  '''^CHANGELOG\.md$''',
+  # The gitleaks config itself mentions rule names, not secrets.
+  '''^\.gitleaks\.toml$''',
+  # The detect-secrets baseline stores salted *hashes* of already-audited
+  # false positives — not secrets, but hex blobs that trip generic rules.
+  '''^\.secrets\.baseline$''',
+]
+regexes = [
+  # Obvious placeholders, not credentials.
+  '''(?i)(your[_-]?api[_-]?key|changeme|placeholder|xxxxx+)''',
+]
+
+# Test fixtures (tests/fixtures/**) contain only synthetic market data with
+# made-up values. If a fixture ever trips a rule, allowlist that fixture by
+# exact path here — never allowlist a rule globally.
