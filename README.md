@@ -83,7 +83,14 @@ Installer behavior:
   - `checkForUpdates()` — update-notification check
   - `openExternal(url)` — allowlisted https URLs only (Kite login)
 - A Content-Security-Policy is set in `index.html`; new windows and external
-  navigation are denied in the main process.
+  navigation are denied in the main process, and every renderer permission
+  request is denied and logged (P6).
+- Every IPC payload from the renderer is validated against a zod schema
+  (`electron/validation.cjs`, P6) before the main process touches it.
+- **Full security documentation lives in [SECURITY.md](SECURITY.md)** —
+  threat model, token lifecycle, secrets inventory, and the dependency-audit
+  exceptions list. Run the audits locally with `make audit` (pip-audit +
+  npm audit) and `make secrets` (gitleaks / detect-secrets).
 - **Local API hardening (P5):** the FastAPI sidecar binds `127.0.0.1` only,
   so it is never reachable off-machine. At every launch the main process
   generates a random 32-byte hex bearer token, hands it to the sidecar via

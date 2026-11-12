@@ -1,41 +1,29 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "bazzar-terminal"
-version = "1.7.0"
-description = "Bazzar Terminal — personal financial terminal: Electron + React UI, FastAPI/DuckDB data layer, quant analytics library"
-readme = "README.md"
+version = "1.8.0"
+description = "Bazzar Terminal - local data layer, API, and desktop shell"
 requires-python = ">=3.11"
-license = { text = "MIT" }
-
-# Runtime dependencies are pinned in requirements.txt (kept for the SPEC
-# contract and the installer payload). Dev tooling is in requirements-dev.txt.
 
 [tool.ruff]
 target-version = "py311"
 line-length = 100
-extend-exclude = ["archive", "build", "dist", "release", "node_modules"]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "W"]
-# E501 line-length is enforced by the formatter, not the linter.
-ignore = ["E501"]
-
-[tool.ruff.lint.isort]
-known-first-party = ["backend", "quant"]
-
-[tool.ruff.lint.per-file-ignores]
-# The 180 quant modules are legacy research scripts: noqa-cleanups happen in
-# P7 when they are standardized. For now only hard errors (F) apply there.
-"quant/**" = ["E", "W", "UP", "B"]
+select = ["E", "F", "I", "UP", "B", "SIM"]
 
 [tool.mypy]
 python_version = "3.11"
+strict = true
 mypy_path = "."
-packages = ["backend"]
+packages = ["backend", "quant"]
+
+[[tool.mypy.overrides]]
+module = ["matplotlib.*", "scipy.*", "requests.*", "keyring.*", "keyrings.*", "duckdb"]
 ignore_missing_imports = true
-warn_unused_ignores = true
-warn_redundant_casts = true
-# Ratchet towards strict: backend/ first, quant/ after P7 standardization.
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-q"

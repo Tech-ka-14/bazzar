@@ -6,9 +6,19 @@ until a maintainer copies them into place (a one-time, one-minute step):
 
 ```bash
 cp docs/ci/security.yml .github/workflows/security.yml
-cp docs/ci/dependabot.yml .github/dependabot.yml
+cp docs/ci/dependabot.yml .github/dependabot.yml   # optional, see below
 git add .github && git commit -m "ci: activate security gate + dependabot (P6)"
 ```
+
+**What already exists:** `.github/workflows/ci.yml` already runs a gitleaks
+secret-scan job (it now picks up the root `.gitleaks.toml` automatically),
+and a basic `.github/dependabot.yml` already watches pip/npm/github-actions.
+The staged `security.yml` therefore only *adds* the two dependency-audit
+jobs (pip-audit, npm audit) plus a weekly schedule — the gitleaks job in it
+is a belt-and-braces duplicate you may delete when copying. The staged
+`dependabot.yml` is an optional upgrade of the existing one (adds update
+grouping and ignores breaking major upgrades of electron/electron-builder/
+vite/vitest); skip the copy if you prefer the current config.
 
 ## What each file does
 
