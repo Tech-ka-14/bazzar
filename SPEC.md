@@ -243,6 +243,30 @@ canonical mount):
 - `src/components/KiteStatus.jsx` — topbar pill polling
   `/api/auth/kite/status` every 30s; "Connect Kite" opens the login URL in
   the system browser via the allowlisted `shell:open-external` IPC.
+- Risk analytics UI (P7-D, roadmap 7.4): `src/api.js` exposes thin wrappers
+  over the analytics endpoints — `getVar(symbol, method, confidence)`,
+  `getVolatility(symbol, model)`, `getPortfolioRisk(weights, confidence)`
+  (POST via the new `apiPost`, same bearer auth) and
+  `getVarBacktest(symbol, confidence)`. Non-2xx responses throw `ApiError`
+  carrying the HTTP status and the parsed `{error: {code, message}}`
+  envelope so the UI renders explicit states.
+- `Equity.jsx` stock deep dive — selecting a watchlist row (click) or any
+  symbol via `SearchInput` opens the deep dive: backend PNG chart
+  (`ChartImage`) plus `src/components/RiskPanel.jsx` (VaR/ES with
+  method selector historical/parametric/montecarlo and confidence 95%/99%,
+  EWMA/GARCH volatility current + annualized, and the VaR backtest summary
+  with exceptions vs expected, Kupiec decision and a green/amber/red Basel
+  zone badge). Each block is stamped `as of {asOf}` with `n_obs` from its
+  own payload; states are loading → data → explicit empty states (422 →
+  "Not enough history ({n_obs} obs, need {minimum})", 404 → "Symbol not
+  synced") — never placeholder numbers.
+- `Home.jsx` portfolio risk card — `src/components/PortfolioRiskCard.jsx`:
+  a few symbol + weight-percent inputs (live sum-to-100 check, matching the
+  API's sum-to-1 weight rule), POSTs to `/api/v1/analytics/portfolio/risk`,
+  and renders VaR/ES, portfolio volatility, undiversified VaR,
+  Sharpe/Sortino and the per-symbol Euler component-VaR split as simple
+  theme bars, with the `asOf`/`n_obs` stamp and the same explicit
+  empty/error states.
 - UI/UX: keep the existing black/gold theme (`src/theme.js`).
 
 ## Electron / config glue (main agent)
