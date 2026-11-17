@@ -1,3 +1,12 @@
+"""Normal linear interest-rate VaR of a cash-flow map.
+
+VaR of a portfolio mapped to PV01 sensitivities theta against an annual
+covariance matrix of interest-rate changes: VaR = Z * sqrt(theta' Omega_h
+theta).
+Reference: Alexander (2008), Market Risk Analysis IV, Formula IV.1.28,
+Example IV.1.8.
+"""
+
 import numpy as np
 from scipy.stats import norm
 
@@ -44,29 +53,67 @@ def calculate_interest_rate_var(
 
 # Example IV.1.8: Normal VaR of a Simple Cash Flow
 # 1. Define the PV01 vector (theta) for 1-year and 2-year vertices
-theta_vector = np.array([50.0, 75.0])
 
-# 2. Construct the Annual Covariance Matrix (Omega)
-vol_1yr = 100.0  # Volatility of 1-year rate in basis points
-vol_2yr = 80.0  # Volatility of 2-year rate in basis points
-correlation = 0.9
 
-covariance_12 = correlation * vol_1yr * vol_2yr
+def compute(theta, omega_annual, horizon_days: int = 10, confidence: float = 0.99) -> dict:
+    """Standard facade: normal linear interest-rate VaR as a JSON dict.
 
-omega_annual_matrix = np.array([[vol_1yr**2, covariance_12], [covariance_12, vol_2yr**2]])
+    Parameters:
+    theta: 1-D array-like of PV01 sensitivities.
+    omega_annual: Square annual covariance matrix (basis points squared)
+    matching len(theta).
+    horizon_days (int): Risk horizon in days.
+    confidence (float): Confidence level in (0, 1), e.g. 0.99.
 
-# 3. VaR Parameters
-h_days = 10
-conf_lvl = 0.99
+    Returns:
+    dict: {"method", "confidence", "horizon_days", "var", "std_dev"}
+    with positive monetary values.
+    """
+    theta = np.asarray(theta, dtype=float).ravel()
+    omega = np.asarray(omega_annual, dtype=float)
+    if theta.size == 0:
+        raise ValueError("theta must contain at least one sensitivity")
+    if omega.shape != (theta.size, theta.size):
+        raise ValueError("omega_annual must be square with size len(theta)")
+    if not 0.0 < confidence < 1.0:
+        raise ValueError("confidence must be in the open interval (0, 1)")
 
-# Execute calculation
-var_10d, omega_10d, std_dev = calculate_interest_rate_var(
-    theta=theta_vector,
-    omega_annual=omega_annual_matrix,
-    horizon_days=h_days,
-    confidence_level=conf_lvl,
-)
+    var, _, std_dev = calculate_interest_rate_var(
+        theta, omega, int(horizon_days), float(confidence)
+    )
+    return {
+        "method": "normal_linear_interest_rate",
+        "confidence": float(confidence),
+        "horizon_days": int(horizon_days),
+        "var": float(var),
+        "std_dev": float(std_dev),
+    }
 
-print(f"10-day Covariance Matrix (Omega_10):\n{omega_10d}\n")
-print(f"10-day Portfolio Standard Deviation: ${std_dev:,.2f}")
-print(f"1% 10-day Interest Rate VaR: ${var_10d:,.0f}")
+
+if __name__ == "__main__":
+    theta_vector = np.array([50.0, 75.0])
+
+    # 2. Construct the Annual Covariance Matrix (Omega)
+    vol_1yr = 100.0  # Volatility of 1-year rate in basis points
+    vol_2yr = 80.0  # Volatility of 2-year rate in basis points
+    correlation = 0.9
+
+    covariance_12 = correlation * vol_1yr * vol_2yr
+
+    omega_annual_matrix = np.array([[vol_1yr**2, covariance_12], [covariance_12, vol_2yr**2]])
+
+    # 3. VaR Parameters
+    h_days = 10
+    conf_lvl = 0.99
+
+    # Execute calculation
+    var_10d, omega_10d, std_dev = calculate_interest_rate_var(
+        theta=theta_vector,
+        omega_annual=omega_annual_matrix,
+        horizon_days=h_days,
+        confidence_level=conf_lvl,
+    )
+
+    print(f"10-day Covariance Matrix (Omega_10):\n{omega_10d}\n")
+    print(f"10-day Portfolio Standard Deviation: ${std_dev:,.2f}")
+    print(f"1% 10-day Interest Rate VaR: ${var_10d:,.0f}")

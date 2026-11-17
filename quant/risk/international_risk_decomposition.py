@@ -1,3 +1,11 @@
+"""International portfolio risk decomposition.
+
+Decomposes the systematic variance of an international portfolio into
+equity, FX and quanto (equity-FX covariance) components via the
+partitioned covariance matrix of equity and FX risk factors.
+Reference: Alexander (2008), Market Risk Analysis II, Example II.1.6.
+"""
+
 import numpy as np
 
 
@@ -47,6 +55,38 @@ def international_portfolio_risk(weights, asset_betas, omega_matrix, num_equity_
         "total_systematic_variance": float(total_systematic_variance),
         "total_systematic_risk": float(np.sqrt(total_systematic_variance)),
     }
+
+
+def compute(weights, asset_betas, omega_matrix, num_equity_factors: int) -> dict:
+    """Standard facade: international risk decomposition as a JSON dict.
+
+    Parameters:
+    weights: 1-D array-like of country weights (first entry domestic).
+    asset_betas: 1-D array-like of betas to local market indices.
+    omega_matrix: Full covariance matrix of equity then FX factors.
+    num_equity_factors (int): Number k of equity market factors; the
+    remaining rows/columns are the FX factors.
+
+    Returns:
+    dict: {"method", "equity_variance", "fx_variance",
+    "quanto_covariance", "total_systematic_variance",
+    "total_systematic_risk"}.
+    """
+    weights = np.asarray(weights, dtype=float).ravel()
+    betas = np.asarray(asset_betas, dtype=float).ravel()
+    omega = np.asarray(omega_matrix, dtype=float)
+    k = int(num_equity_factors)
+    if weights.size != betas.size:
+        raise ValueError("weights and asset_betas must have equal length")
+    if not 1 <= k <= weights.size:
+        raise ValueError("num_equity_factors must be in [1, len(weights)]")
+    n_total = k + (weights.size - 1)  # k equity factors + one FX factor per foreign asset
+    if omega.shape != (n_total, n_total):
+        raise ValueError("omega_matrix has inconsistent dimensions")
+
+    results = international_portfolio_risk(weights, betas, omega, k)
+    results["method"] = "international_decomposition"
+    return results
 
 
 if __name__ == "__main__":

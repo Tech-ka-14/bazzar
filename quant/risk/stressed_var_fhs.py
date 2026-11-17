@@ -1,3 +1,12 @@
+"""Stressed VaR via filtered historical simulation (FHS).
+
+Bootstraps empirical standardized residuals through an asymmetric GARCH
+variance recursion starting from a shock state, for a gradually
+liquidated portfolio, to produce stressed simulated total returns.
+Reference: Alexander (2008), Market Risk Analysis IV, Section IV.3.5
+(filtered historical simulation).
+"""
+
 import numpy as np
 
 
@@ -43,3 +52,68 @@ def simulate_stressed_fhs_garch(
         total_simulated_returns[i] = np.sum(path_returns * liquidation_weights)
 
     return total_simulated_returns
+
+
+def compute(
+    historical_standardized_residuals,
+    n_simulations: int = 10000,
+    h_days: int = 10,
+    shock_return: float = -0.05,
+    shock_vol_annual: float = 0.40,
+    omega: float = 1e-6,
+    alpha_garch: float = 0.05,
+    beta: float = 0.90,
+    lambda_asym: float = 0.0,
+    alpha: float = 0.01,
+    seed: int = None,
+) -> dict:
+    """Standard facade: stressed FHS VaR/ETL as a JSON-serializable dict.
+
+    Parameters:
+    historical_standardized_residuals: 1-D array-like of standardized
+    residuals to bootstrap.
+    n_simulations (int): Number of Monte Carlo paths.
+    h_days (int): Liquidation horizon in days.
+    shock_return (float): Initial (day-0) stressed return.
+    shock_vol_annual (float): Annualized shock volatility (positive).
+    omega, alpha_garch, beta (float): GARCH variance recursion parameters.
+    lambda_asym (float): Asymmetry (leverage) shift parameter.
+    alpha (float): Tail probability in (0, 1), e.g. 0.01.
+    seed (int, optional): RNG seed for reproducibility.
+
+    Returns:
+    dict: {"method", "alpha", "h_days", "n_simulations", "var", "etl"}
+    with positive loss fractions.
+    """
+    residuals = np.asarray(historical_standardized_residuals, dtype=float).ravel()
+    if residuals.size == 0:
+        raise ValueError("historical_standardized_residuals must be non-empty")
+    if shock_vol_annual <= 0:
+        raise ValueError("shock_vol_annual must be positive")
+    if not 0.0 < alpha < 1.0:
+        raise ValueError("alpha must be in the open interval (0, 1)")
+    if seed is not None:
+        np.random.seed(seed)
+
+    sims = simulate_stressed_fhs_garch(
+        residuals,
+        int(n_simulations),
+        int(h_days),
+        float(shock_return),
+        float(shock_vol_annual),
+        float(omega),
+        float(alpha_garch),
+        float(beta),
+        float(lambda_asym),
+    )
+    var = float(-np.quantile(sims, alpha))
+    tail = sims[sims < -var]
+    etl = float(-np.mean(tail)) if tail.size > 0 else var
+    return {
+        "method": "stressed_fhs",
+        "alpha": float(alpha),
+        "h_days": int(h_days),
+        "n_simulations": int(n_simulations),
+        "var": var,
+        "etl": etl,
+    }

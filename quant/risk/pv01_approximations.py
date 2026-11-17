@@ -1,3 +1,11 @@
+"""Exact and approximate PV01 of a single cash flow.
+
+Exact discrete-compounding PV01 (bump and reprice) and analytical
+approximations under discrete and continuous compounding.
+Reference: Alexander (2008), Market Risk Analysis IV, Equations
+IV.2.27-IV.2.30, Example IV.2.4.
+"""
+
 import numpy as np
 
 
@@ -19,11 +27,40 @@ def pv01_approx_continuous(cash_flow: float, rate: float, maturity_years: float)
 
 
 # Example IV.2.4: Finding PV01 for a Swap's Year-1 Cash Flow
-c_1 = 3_000_000  # $3 million cash flow in Year 1
-r_1 = 0.04  # 4% interest rate
 
-exact_val = pv01_exact_discrete(c_1, r_1, 1)
-approx_disc = pv01_approx_discrete(c_1, r_1, 1)
 
-print(f"Exact PV01 (Discrete): ${exact_val:.4f}")
-print(f"Approx PV01 (Discrete): ${approx_disc:.4f}")
+def compute(cash_flow: float, rate: float, maturity_years: float) -> dict:
+    """Standard facade: exact and approximate PV01 as a JSON-serializable dict.
+
+    Parameters:
+    cash_flow (float): Cash flow amount at maturity.
+    rate (float): Interest rate as a fraction (e.g. 0.04).
+    maturity_years (float): Time to the cash flow in years (positive).
+
+    Returns:
+    dict: {"method", "pv01_exact_discrete", "pv01_approx_discrete",
+    "pv01_approx_continuous"}.
+    """
+    if maturity_years <= 0:
+        raise ValueError("maturity_years must be positive")
+
+    exact = pv01_exact_discrete(float(cash_flow), float(rate), float(maturity_years))
+    approx_d = pv01_approx_discrete(float(cash_flow), float(rate), float(maturity_years))
+    approx_c = pv01_approx_continuous(float(cash_flow), float(rate), float(maturity_years))
+    return {
+        "method": "pv01",
+        "pv01_exact_discrete": float(exact),
+        "pv01_approx_discrete": float(approx_d),
+        "pv01_approx_continuous": float(approx_c),
+    }
+
+
+if __name__ == "__main__":
+    c_1 = 3_000_000  # $3 million cash flow in Year 1
+    r_1 = 0.04  # 4% interest rate
+
+    exact_val = pv01_exact_discrete(c_1, r_1, 1)
+    approx_disc = pv01_approx_discrete(c_1, r_1, 1)
+
+    print(f"Exact PV01 (Discrete): ${exact_val:.4f}")
+    print(f"Approx PV01 (Discrete): ${approx_disc:.4f}")

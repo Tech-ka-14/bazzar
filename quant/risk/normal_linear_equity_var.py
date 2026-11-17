@@ -1,3 +1,11 @@
+"""Normal linear equity VaR of a beta-mapped portfolio.
+
+The net dollar beta of the portfolio is multiplied by the risk factor's
+h-day VaR: VaR = beta_$ * (Z sigma_h - mu_h).
+Reference: Alexander (2008), Market Risk Analysis IV, Formula IV.1.26,
+Example IV.1.7.
+"""
+
 import numpy as np
 from scipy.stats import norm
 
@@ -55,22 +63,76 @@ def calculate_equity_var(
 
 # Example IV.1.7: Equity VaR for a Two-Stock Portfolio
 # Portfolio Details
-positions_millions = [1.0, 2.0]  # $1m and $2m invested
-asset_betas = [1.2, 0.8]
 
-# Risk Factor (Market Index) Details
-market_mu_annual = 0.05  # 5% annual expected excess return
-market_sigma_annual = 0.20  # 20% annual volatility
-risk_horizon = 10  # 10-day VaR
-conf_level = 0.99  # 1% Significance Level
 
-# 1. Calculate Dollar Beta
-net_dollar_beta = calculate_dollar_beta(positions_millions, asset_betas)
+def compute(
+    positions,
+    asset_betas,
+    mu_annual: float,
+    sigma_annual: float,
+    horizon_days: int = 10,
+    confidence: float = 0.99,
+) -> dict:
+    """Standard facade: normal linear equity VaR as a JSON-serializable dict.
 
-# 2. Calculate Systematic Equity VaR
-systematic_var = calculate_equity_var(
-    net_dollar_beta, market_mu_annual, market_sigma_annual, risk_horizon, conf_level
-)
+    Parameters:
+    positions: 1-D array-like of position values (millions of currency).
+    asset_betas: 1-D array-like of asset betas, same length as positions.
+    mu_annual (float): Expected annual excess return of the market factor.
+    sigma_annual (float): Annual volatility of the market factor (> 0).
+    horizon_days (int): Risk horizon in days.
+    confidence (float): Confidence level in (0, 1), e.g. 0.99.
 
-print(f"Net Portfolio Dollar Beta: ${net_dollar_beta:.2f} million")
-print(f"1% 10-day Equity VaR: ${systematic_var * 1_000_000:,.0f}")
+    Returns:
+    dict: {"method", "confidence", "horizon_days", "dollar_beta",
+    "var"} where "var" is the positive monetary loss (same units as
+    positions).
+    """
+    positions = np.asarray(positions, dtype=float).ravel()
+    betas = np.asarray(asset_betas, dtype=float).ravel()
+    if positions.size == 0:
+        raise ValueError("positions must contain at least one entry")
+    if betas.size != positions.size:
+        raise ValueError("asset_betas must have the same length as positions")
+    if sigma_annual <= 0:
+        raise ValueError("sigma_annual must be positive")
+    if not 0.0 < confidence < 1.0:
+        raise ValueError("confidence must be in the open interval (0, 1)")
+
+    dollar_beta = calculate_dollar_beta(positions.tolist(), betas.tolist())
+    var = calculate_equity_var(
+        dollar_beta,
+        float(mu_annual),
+        float(sigma_annual),
+        int(horizon_days),
+        float(confidence),
+    )
+    return {
+        "method": "normal_linear_equity",
+        "confidence": float(confidence),
+        "horizon_days": int(horizon_days),
+        "dollar_beta": float(dollar_beta),
+        "var": float(var),
+    }
+
+
+if __name__ == "__main__":
+    positions_millions = [1.0, 2.0]  # $1m and $2m invested
+    asset_betas = [1.2, 0.8]
+
+    # Risk Factor (Market Index) Details
+    market_mu_annual = 0.05  # 5% annual expected excess return
+    market_sigma_annual = 0.20  # 20% annual volatility
+    risk_horizon = 10  # 10-day VaR
+    conf_level = 0.99  # 1% Significance Level
+
+    # 1. Calculate Dollar Beta
+    net_dollar_beta = calculate_dollar_beta(positions_millions, asset_betas)
+
+    # 2. Calculate Systematic Equity VaR
+    systematic_var = calculate_equity_var(
+        net_dollar_beta, market_mu_annual, market_sigma_annual, risk_horizon, conf_level
+    )
+
+    print(f"Net Portfolio Dollar Beta: ${net_dollar_beta:.2f} million")
+    print(f"1% 10-day Equity VaR: ${systematic_var * 1_000_000:,.0f}")

@@ -1,3 +1,11 @@
+"""Stressed VaR via Monte Carlo asymmetric GARCH simulation.
+
+Simulates total returns for a gradually liquidated portfolio through an
+asymmetric GARCH variance recursion starting from a stressed shock state
+with normal innovations.
+Reference: Alexander (2008), Market Risk Analysis IV, Example IV.7.19.
+"""
+
 import numpy as np
 
 
@@ -51,16 +59,77 @@ def simulate_stressed_mc_garch(
 
 # Example IV.7.19 Parameters
 # Simulated 10-day Stressed VaR with uniform liquidation
-stressed_returns = simulate_stressed_mc_garch(
-    n_simulations=10000,
-    h_days=10,
-    shock_return=-0.10,  # -10% shock
-    shock_vol_annual=0.60,  # 60% annualized volatility
-    omega=0.000002,  # Example GARCH params (replace with actual from Table IV.3.5)
-    alpha=0.05,
-    beta=0.90,
-    lambda_asym=0.0,
-)
 
-# Calculate 0.1% VaR (Result should be ~32.49% as per Table IV.7.11)
-stressed_var_99_9 = -np.quantile(stressed_returns, 0.001)
+
+def compute(
+    n_simulations: int = 10000,
+    h_days: int = 10,
+    shock_return: float = -0.10,
+    shock_vol_annual: float = 0.60,
+    omega: float = 0.000002,
+    alpha_garch: float = 0.05,
+    beta: float = 0.90,
+    lambda_asym: float = 0.0,
+    alpha: float = 0.01,
+    seed: int = None,
+) -> dict:
+    """Standard facade: stressed MC GARCH VaR/ETL as a JSON-serializable dict.
+
+    Parameters:
+    n_simulations (int): Number of Monte Carlo paths.
+    h_days (int): Liquidation horizon in days.
+    shock_return (float): Initial (day-0) stressed return.
+    shock_vol_annual (float): Annualized shock volatility (positive).
+    omega, alpha_garch, beta (float): GARCH variance recursion parameters.
+    lambda_asym (float): Asymmetry (leverage) shift parameter.
+    alpha (float): Tail probability in (0, 1), e.g. 0.01.
+    seed (int, optional): RNG seed for reproducibility.
+
+    Returns:
+    dict: {"method", "alpha", "h_days", "n_simulations", "var", "etl"}
+    with positive loss fractions.
+    """
+    if shock_vol_annual <= 0:
+        raise ValueError("shock_vol_annual must be positive")
+    if not 0.0 < alpha < 1.0:
+        raise ValueError("alpha must be in the open interval (0, 1)")
+    if seed is not None:
+        np.random.seed(seed)
+
+    sims = simulate_stressed_mc_garch(
+        int(n_simulations),
+        int(h_days),
+        float(shock_return),
+        float(shock_vol_annual),
+        float(omega),
+        float(alpha_garch),
+        float(beta),
+        float(lambda_asym),
+    )
+    var = float(-np.quantile(sims, alpha))
+    tail = sims[sims < -var]
+    etl = float(-np.mean(tail)) if tail.size > 0 else var
+    return {
+        "method": "stressed_mc_garch",
+        "alpha": float(alpha),
+        "h_days": int(h_days),
+        "n_simulations": int(n_simulations),
+        "var": var,
+        "etl": etl,
+    }
+
+
+if __name__ == "__main__":
+    stressed_returns = simulate_stressed_mc_garch(
+        n_simulations=10000,
+        h_days=10,
+        shock_return=-0.10,  # -10% shock
+        shock_vol_annual=0.60,  # 60% annualized volatility
+        omega=0.000002,  # Example GARCH params (replace with actual from Table IV.3.5)
+        alpha=0.05,
+        beta=0.90,
+        lambda_asym=0.0,
+    )
+
+    # Calculate 0.1% VaR (Result should be ~32.49% as per Table IV.7.11)
+    stressed_var_99_9 = -np.quantile(stressed_returns, 0.001)
