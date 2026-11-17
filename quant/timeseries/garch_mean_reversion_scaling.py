@@ -120,5 +120,5 @@ if __name__ == "__main__":
     print(f"Empirical {horizon}-Day Vol: {vol_h:.4f}")
     print(f"Scaling Factor: {factor:.4f}")
     print(
-        f"(If the scaling factor is < 1.0, GARCH mean reversion causes risk to scale slower than the square root of time)"
+        "(If the scaling factor is < 1.0, GARCH mean reversion causes risk to scale slower than the square root of time)"
     )

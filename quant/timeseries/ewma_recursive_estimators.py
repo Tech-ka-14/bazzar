@@ -42,10 +42,10 @@ def calculate_ewma_metrics(data, lambda_param):
         ewma_mean[t] = lambda_param * ewma_mean[t - 1] + (1 - lambda_param) * data[t]
 
         # 2. EWMA Variance (Squared deviations from the recursive mean)
-        deviation_squared = (data[t] - ewma_mean[t - 1]) ** 2
-        ewma_variance[t] = lambda_param * ewma_variance[t - 1] + (
-            1 - lambda_param
-        ) * deviation_squared
+        ewma_variance[t] = (
+            lambda_param * ewma_variance[t - 1]
+            + (1 - lambda_param) * (data[t] - ewma_mean[t - 1]) ** 2
+        )
 
         # 3. EWMA Volatility
         ewma_volatility[t] = np.sqrt(ewma_variance[t])
