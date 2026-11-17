@@ -10,7 +10,7 @@ duckdb>=1.0
 fastapi>=0.110
 uvicorn>=0.29
 matplotlib>=3.8
-requests>=2.31
+requests>=2.34.2
 
 # Configuration & resilience (P1)
 pydantic>=2.7
