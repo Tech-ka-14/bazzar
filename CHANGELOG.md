@@ -3,6 +3,48 @@
 All notable changes to Bazzar Terminal. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 versioning: [SemVer](https://semver.org/).
 
+## [1.9.0] - 2026-10-12
+
+### Added (P7 — quant standardization + analytics endpoints, roadmap 7.1–7.3)
+- **P7-A flagship standardization (7.1):** the ~20 flagship quant modules
+  (`risk/`, `timeseries/`, `portfolio/`, `copulas/`, `stats/`) are
+  import-pure (legacy demos moved verbatim under `if __name__ ==
+  "__main__":`), carry module docstrings with the governing formula, and
+  expose a `compute(...)` facade returning plain JSON-serializable dicts —
+  per the P7 module standard in `quant/README.md`.
+- **P7-B mass standardization (7.2):** the same standard applied to all
+  remaining quant modules (187 total), gated by
+  `tests/test_quant_import.py` (import purity + facade presence) on top of
+  the pre-existing compile gate.
+- **P7-C analytics service + API (7.3):** new `backend/analytics.py`
+  service layer and `backend/analytics_routes.py`, mounted on `/api/v1`
+  (+ deprecated `/api` alias), calling **only** the `quant/api.py` dispatch
+  layer:
+  - `GET /api/v1/analytics/var?symbol=&method=historical|parametric|montecarlo&confidence=`
+    → VaR + ES of simple daily returns (positive loss fractions).
+  - `GET /api/v1/analytics/volatility?symbol=&model=ewma|garch` → current
+    conditional + annualized (252d) volatility.
+  - `POST /api/v1/analytics/portfolio/risk` → normal-linear portfolio
+    VaR/ES with Euler component-VaR split, annualized Sharpe/Sortino
+    (zero risk-free rate, documented).
+  - `GET /api/v1/analytics/backtest/var?symbol=&confidence=` → rolling
+    one-day-ahead historical-simulation VaR backtest with Kupiec +
+    Christoffersen decisions (5% significance) and the Basel zone
+    (`green|amber|red`).
+  - Never-fabricate guarantees: minimum-history floors (250 returns for
+    VaR/portfolio, 60 for volatility, 250-day window + 30 days for the
+    backtest) → `422 insufficient_data`; unknown method/model → 400 listing
+    valid options; unknown symbol → 404. Every payload carries `asOf`,
+    `source` and `cached`.
+  - Results cached in the new DuckDB `analytics_cache` table (migration
+    `0005_analytics_cache.sql`), keyed by endpoint + params + data
+    fingerprint (latest bar date + row count) so a fresh ingest invalidates
+    automatically; hits replay the payload with `cached: true`.
+  - New tests: `tests/test_analytics.py` (service-level known-answer checks
+    against `quant/api`, constructed-exception backtest) and
+    `tests/test_analytics_api.py` (exact response shapes, envelope paths,
+    cache-hit behaviour).
+
 ## [1.8.0] - 2026-10-12
 
 ### Added (P6 — security pass, roadmap 6.1–6.5)
