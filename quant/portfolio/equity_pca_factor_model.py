@@ -1,3 +1,11 @@
+"""Equity PCA statistical factor model.
+
+Extracts the first k principal components of the equity return covariance
+matrix as statistical risk factors, then regresses each stock's returns on
+them to obtain per-stock alphas, factor loadings (betas), specific variances
+and R-squared values.
+"""
+
 import numpy as np
 import statsmodels.api as sm
 
@@ -63,6 +71,38 @@ def build_equity_pca_model(returns_matrix, k_components):
         "betas": betas,
         "specific_variances": specific_variances,
         "r_squared": r_squared_vals,
+    }
+
+
+def compute(returns_matrix, k_components: int = 2) -> dict:
+    """Standard facade: PCA factor model estimates as a JSON dict.
+
+    Parameters:
+    returns_matrix: 2-D array-like (T observations x n stocks) of returns.
+    k_components (int): Number of principal components retained
+    (1 <= k <= n).
+
+    Returns:
+    dict: {"n_observations", "n_stocks", "k_components", "alphas", "betas",
+    "specific_variances", "r_squared"} with betas as an n x k nested list.
+    """
+    returns_matrix = np.asarray(returns_matrix, dtype=float)
+    if returns_matrix.ndim != 2 or returns_matrix.shape[0] < 3:
+        raise ValueError("returns_matrix must be a 2-D array with at least three rows")
+    n_stocks = returns_matrix.shape[1]
+    k_components = int(k_components)
+    if not 1 <= k_components <= n_stocks:
+        raise ValueError("k_components must be between 1 and the number of stocks")
+
+    results = build_equity_pca_model(returns_matrix, k_components)
+    return {
+        "n_observations": int(returns_matrix.shape[0]),
+        "n_stocks": int(n_stocks),
+        "k_components": k_components,
+        "alphas": [float(a) for a in results["alphas"]],
+        "betas": np.asarray(results["betas"], dtype=float).tolist(),
+        "specific_variances": [float(v) for v in results["specific_variances"]],
+        "r_squared": [float(r) for r in results["r_squared"]],
     }
 
 

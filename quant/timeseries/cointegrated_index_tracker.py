@@ -1,3 +1,11 @@
+"""Cointegration-based index tracking portfolio.
+
+Engle-Granger regression of the log benchmark price on log component prices;
+the normalized regression coefficients are the tracking weights, and the ADF
+test on the residual spread checks that the tracker is cointegrated with the
+benchmark (no drift).
+"""
+
 import numpy as np
 import statsmodels.api as sm
 from statsmodels.tsa.stattools import adfuller
@@ -42,6 +50,40 @@ def build_cointegrated_tracker(benchmark_prices, component_prices):
         "Tracking Spread Stationarity (ADF p-value)": adf_result[1],
         "Mean-Reverting (No Drift)": is_cointegrated,
         "Model R-Squared": tracking_model.rsquared,
+    }
+
+
+def compute(benchmark_prices, component_prices) -> dict:
+    """Standard facade: cointegrated tracker weights as a JSON dict.
+
+    Parameters:
+    benchmark_prices: 1-D array-like of benchmark index prices (positive).
+    component_prices: pandas DataFrame (or dict of equal-length column lists)
+    of component asset prices over the same dates.
+
+    Returns:
+    dict: {"optimal_weights", "adf_p_value", "is_cointegrated",
+    "r_squared"}; weights are normalized to sum to 1.
+    """
+    import pandas as pd
+
+    if isinstance(benchmark_prices, pd.Series):
+        benchmark_prices = benchmark_prices.astype(float).reset_index(drop=True)
+    else:
+        benchmark_prices = pd.Series(np.asarray(benchmark_prices, dtype=float).ravel())
+    if not isinstance(component_prices, pd.DataFrame):
+        component_prices = pd.DataFrame(component_prices)
+    if len(benchmark_prices) != len(component_prices):
+        raise ValueError("benchmark_prices and component_prices must have equal length")
+    if (benchmark_prices <= 0).any() or (component_prices <= 0).any().any():
+        raise ValueError("prices must be strictly positive to take logarithms")
+
+    results = build_cointegrated_tracker(benchmark_prices, component_prices)
+    return {
+        "optimal_weights": {str(k): float(v) for k, v in results["Optimal Weights"].items()},
+        "adf_p_value": float(results["Tracking Spread Stationarity (ADF p-value)"]),
+        "is_cointegrated": bool(results["Mean-Reverting (No Drift)"]),
+        "r_squared": float(results["Model R-Squared"]),
     }
 
 

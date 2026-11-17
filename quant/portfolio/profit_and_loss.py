@@ -1,3 +1,10 @@
+"""Profit and loss (P&L) calculations.
+
+Backward-looking P&L: P_t - P_{t-1} (realized change over the last period);
+forward-looking P&L: P_{t+1} - P_t (next period's change, known only ex post
+for historical series).
+"""
+
 import pandas as pd
 
 
@@ -24,6 +31,33 @@ def calculate_pnl(prices_data, value_column="Portfolio_Value"):
     df["PnL_Forward"] = df[value_column].shift(-1) - df[value_column]
 
     return df
+
+
+def compute(prices_data, value_column: str = "Portfolio_Value") -> dict:
+    """Standard facade: P&L series summary as a JSON-serializable dict.
+
+    Parameters:
+    prices_data: Dict of column lists (or pandas DataFrame) containing a
+    value/price column.
+    value_column (str): Name of the column to difference.
+
+    Returns:
+    dict: {"value_column", "n_periods", "backward_pnl", "forward_pnl",
+    "total_backward_pnl"}; the first backward and last forward entries are
+    None (undefined), matching pandas diff/shift semantics.
+    """
+    df = calculate_pnl(prices_data, value_column=value_column)
+
+    def _series(column):
+        return [None if pd.isna(v) else float(v) for v in df[column]]
+
+    return {
+        "value_column": str(value_column),
+        "n_periods": int(len(df)),
+        "backward_pnl": _series("PnL_Backward"),
+        "forward_pnl": _series("PnL_Forward"),
+        "total_backward_pnl": float(df["PnL_Backward"].sum()),
+    }
 
 
 # --- Testing with a hypothetical portfolio value sequence ---

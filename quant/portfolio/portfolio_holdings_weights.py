@@ -1,3 +1,10 @@
+"""Portfolio holdings, values and weights over time.
+
+For constant holdings n_i, the portfolio value is P_t = sum_i n_i p_{it}
+and the portfolio weights are w_{it} = n_i p_{it} / P_t (Example I.1.5,
+Alexander 2008).
+"""
+
 import pandas as pd
 
 
@@ -33,6 +40,32 @@ def analyze_portfolio(holdings, prices_data):
         df[weight_col_name] = df[f"Value_{asset}"] / df["Portfolio_Value"]
 
     return df
+
+
+def compute(holdings, prices_data) -> dict:
+    """Standard facade: holdings-based weights summary as a JSON dict.
+
+    Parameters:
+    holdings: Dict of {asset_name: quantity} (constant holdings).
+    prices_data: Dict of price columns over time (or pandas DataFrame); must
+    contain one column per held asset.
+
+    Returns:
+    dict: {"n_periods", "portfolio_values", "final_weights",
+    "final_value"} with the portfolio value series, the latest weights per
+    asset and the latest total value.
+    """
+    if not isinstance(holdings, dict) or not holdings:
+        raise ValueError("holdings must be a non-empty dict of {asset: quantity}")
+    df = analyze_portfolio(holdings, prices_data)
+
+    final_weights = {str(asset): float(df[f"Weight_{asset}"].iloc[-1]) for asset in holdings}
+    return {
+        "n_periods": int(len(df)),
+        "portfolio_values": [float(v) for v in df["Portfolio_Value"]],
+        "final_weights": final_weights,
+        "final_value": float(df["Portfolio_Value"].iloc[-1]),
+    }
 
 
 # --- Testing with Example I.1.5 from the text ---

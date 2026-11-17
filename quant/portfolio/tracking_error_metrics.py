@@ -1,3 +1,11 @@
+"""Active risk and tracking error metrics.
+
+Active return = R_fund - R_benchmark. Raw tracking error is the root mean
+square of active returns (for passive index trackers); the mean-adjusted
+tracking error is their sample standard deviation around the expected
+outperformance (for active funds).
+"""
+
 import numpy as np
 
 
@@ -31,6 +39,26 @@ def calculate_active_risk_metrics(fund_returns, benchmark_returns):
         "raw_tracking_error": float(raw_tracking_error),
         "mean_adjusted_tracking_error": float(mean_adj_tracking_error),
     }
+
+
+def compute(fund_returns, benchmark_returns) -> dict:
+    """Standard facade: active risk metrics as a JSON-serializable dict.
+
+    Parameters:
+    fund_returns: 1-D array-like of the fund's returns.
+    benchmark_returns: 1-D array-like of the benchmark's returns, same length.
+
+    Returns:
+    dict: {"n", "mean_active_return", "raw_tracking_error",
+    "mean_adjusted_tracking_error"} with plain floats.
+    """
+    fund_returns = np.asarray(fund_returns, dtype=float).ravel()
+    benchmark_returns = np.asarray(benchmark_returns, dtype=float).ravel()
+    if fund_returns.size < 2 or fund_returns.size != benchmark_returns.size:
+        raise ValueError("fund_returns and benchmark_returns must have equal length >= 2")
+
+    metrics = calculate_active_risk_metrics(fund_returns, benchmark_returns)
+    return {"n": int(fund_returns.size), **{k: float(v) for k, v in metrics.items()}}
 
 
 if __name__ == "__main__":

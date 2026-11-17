@@ -1,3 +1,11 @@
+"""CAPM joint alpha test.
+
+Joint chi-squared test that all n asset alphas are zero:
+W = k_M * alpha' Sigma^{-1} alpha ~ chi^2(n), where Sigma is the residual
+covariance from per-asset market-model regressions and
+k_M = 1 / (1 + (mean(X) / std(X))^2) adjusts for the market factor.
+"""
+
 import numpy as np
 import scipy.stats as stats
 import statsmodels.api as sm
@@ -41,6 +49,38 @@ def test_capm_joint_alphas(asset_excess_returns, market_excess_returns):
     p_value = stats.chi2.sf(W_stat, df=n)
 
     return W_stat, p_value, alphas
+
+
+def compute(asset_excess_returns, market_excess_returns) -> dict:
+    """Standard facade: CAPM joint alpha test as a JSON dict.
+
+    Parameters:
+    asset_excess_returns: 2-D array-like (T x n) of excess returns for n
+    assets.
+    market_excess_returns: 1-D array-like (T) of market excess returns.
+
+    Returns:
+    dict: {"n_assets", "n_observations", "test_statistic", "p_value",
+    "alphas", "reject_h0_at_5pct"} with plain floats/bools.
+    """
+    asset_excess_returns = np.asarray(asset_excess_returns, dtype=float)
+    market_excess_returns = np.asarray(market_excess_returns, dtype=float).ravel()
+    if asset_excess_returns.ndim != 2:
+        raise ValueError("asset_excess_returns must be a 2-D array (T x n)")
+    if asset_excess_returns.shape[0] != market_excess_returns.size:
+        raise ValueError("market_excess_returns must match the T dimension of the assets")
+    if asset_excess_returns.shape[0] <= asset_excess_returns.shape[1] + 2:
+        raise ValueError("need more observations than assets for the residual covariance")
+
+    w_stat, p_value, alphas = test_capm_joint_alphas(asset_excess_returns, market_excess_returns)
+    return {
+        "n_assets": int(asset_excess_returns.shape[1]),
+        "n_observations": int(asset_excess_returns.shape[0]),
+        "test_statistic": float(w_stat),
+        "p_value": float(p_value),
+        "alphas": [float(a) for a in alphas],
+        "reject_h0_at_5pct": bool(p_value < 0.05),
+    }
 
 
 if __name__ == "__main__":

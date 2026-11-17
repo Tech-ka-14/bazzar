@@ -1,3 +1,11 @@
+"""N-asset portfolio optimization (Markowitz).
+
+Global minimum variance weights from the inverse covariance matrix:
+w = V^{-1} 1 / (1' V^{-1} 1), min variance = 1 / (1' V^{-1} 1); and the
+Markowitz target-return portfolio solved via the augmented first-order
+system (Equation I.6.36, Alexander 2008).
+"""
+
 import numpy as np
 
 
@@ -51,6 +59,49 @@ def markowitz_target_return_portfolio(cov_matrix, expected_returns, target_retur
     # Extract weights (ignoring the two Lagrange multipliers at the end)
     optimal_weights = solution[:n]
     return optimal_weights
+
+
+def compute(data, target_return: float = None) -> dict:
+    """Standard facade: GMV (and optionally Markowitz) weights as a JSON dict.
+
+    Parameters:
+    data: 2-D array-like (T observations x n assets) of returns used to
+    estimate the covariance matrix and the expected returns.
+    target_return (float, optional): When supplied, also solves the
+    Markowitz minimum-variance portfolio for this target expected return
+    (per-period, matching the frequency of data).
+
+    Returns:
+    dict: {"n_assets", "n_observations", "gmv_weights", "gmv_variance",
+    "gmv_volatility", "target_return", "markowitz_weights"}; the last two
+    are None unless target_return is supplied.
+    """
+    data = np.asarray(data, dtype=float)
+    if data.ndim != 2 or data.shape[0] <= data.shape[1]:
+        raise ValueError("data must be a 2-D array with more observations than assets")
+
+    cov_matrix = np.cov(data, rowvar=False)
+    gmv_weights, gmv_variance = global_minimum_variance_portfolio(cov_matrix)
+
+    markowitz_weights = None
+    if target_return is not None:
+        expected_returns = np.mean(data, axis=0)
+        markowitz_weights = [
+            float(w)
+            for w in markowitz_target_return_portfolio(
+                cov_matrix, expected_returns, float(target_return)
+            )
+        ]
+
+    return {
+        "n_assets": int(data.shape[1]),
+        "n_observations": int(data.shape[0]),
+        "gmv_weights": [float(w) for w in gmv_weights],
+        "gmv_variance": float(gmv_variance),
+        "gmv_volatility": float(np.sqrt(gmv_variance)),
+        "target_return": None if target_return is None else float(target_return),
+        "markowitz_weights": markowitz_weights,
+    }
 
 
 if __name__ == "__main__":

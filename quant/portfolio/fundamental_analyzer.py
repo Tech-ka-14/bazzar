@@ -1,3 +1,10 @@
+"""Fundamental analysis and corporate finance toolkit.
+
+Financial-statement ratios (liquidity, leverage, turnover, profitability,
+valuation), cash-flow identities and growth models, fortified with
+production-grade error handling for imperfect CSV data.
+"""
+
 # fundamental_analyzer.py
 
 from typing import Dict, List, Optional, Union
@@ -505,6 +512,48 @@ class FundamentalAnalyzer:
             df["Times Interest Earned"] = safe_apply(self.times_interest_earned, "EBIT", "Interest")
 
         return df
+
+
+def compute(data, column_mapping: Optional[Dict[str, str]] = None) -> dict:
+    """Standard facade: batch ratio analysis as a JSON-serializable dict.
+
+    Parameters:
+    data: pandas DataFrame (or dict of equal-length column lists) of company
+    financials, one row per company.
+    column_mapping (dict, optional): Maps non-standard column headers to the
+    standard names used by FundamentalAnalyzer.
+
+    Returns:
+    dict: {"n_rows", "columns", "rows"} where rows is the processed dataset
+    as a list of per-company dicts; undefined ratios (division by zero or
+    missing inputs) are None.
+    """
+    if not isinstance(data, pd.DataFrame):
+        data = pd.DataFrame(data)
+    if data.empty:
+        raise ValueError("data must contain at least one row")
+
+    analyzer = FundamentalAnalyzer(data)
+    results = analyzer.process_financial_dataset(column_mapping=column_mapping)
+
+    def _json_value(value):
+        if pd.isna(value):
+            return None
+        if isinstance(value, (bool, np.bool_)):
+            return bool(value)
+        if isinstance(value, (int, float, np.integer, np.floating)):
+            return float(value)
+        return str(value)
+
+    rows = [
+        {str(col): _json_value(record[col]) for col in results.columns}
+        for record in results.to_dict(orient="records")
+    ]
+    return {
+        "n_rows": int(len(results)),
+        "columns": [str(c) for c in results.columns],
+        "rows": rows,
+    }
 
 
 # ==========================================

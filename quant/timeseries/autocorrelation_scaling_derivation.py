@@ -1,3 +1,10 @@
+"""Autocorrelation adjustment for scaling Normal linear VaR.
+
+Adjusted horizon h_tilde for an AR(1) return process (Equation IV.2.10,
+Alexander 2008) and the corresponding scaled Normal linear VaR
+VaR_h = sqrt(h_tilde) * z_alpha * sigma_1 - h * mu_1 (Equation IV.2.11).
+"""
+
 import numpy as np
 from scipy.stats import norm
 
@@ -34,21 +41,62 @@ def calculate_autocorrelated_var(
     return var_h, h_tilde
 
 
-# Example IV.2.1: Adjusting Normal Linear VaR for Autocorrelation
-mu_daily = 0.0001  # 0.01% daily mean
-sigma_daily = 0.01  # 1% daily volatility
-rho_ar1 = 0.2  # Autocorrelation
-significance = 0.01  # 1% VaR
+def compute(mu_1: float, sigma_1: float, h: int, rho: float = 0.0, alpha: float = 0.01) -> dict:
+    """Standard facade: autocorrelation-adjusted Normal VaR as a JSON dict.
 
-print("--- Example IV.2.1: h = 250 days ---")
-var_250, h_tilde_250 = calculate_autocorrelated_var(
-    mu_daily, sigma_daily, 250, rho_ar1, significance
-)
-print(f"Adjustment Factor added to h: {h_tilde_250 - 250:.3f}")
-print(f"Adjusted Horizon (h_tilde): {h_tilde_250:.3f}")
-print(f"Annual Volatility: {sigma_daily * np.sqrt(h_tilde_250):.2%}")
+    Parameters:
+    mu_1 (float): Daily mean return (fraction).
+    sigma_1 (float): Daily volatility (fraction), must be positive.
+    h (int): Horizon in days (>= 1).
+    rho (float): First-order autocorrelation of returns, |rho| < 1.
+    alpha (float): VaR significance level in (0, 1), e.g. 0.01 for 99% VaR.
 
-print("\n--- Example IV.2.1: h = 10 days ---")
-var_10, h_tilde_10 = calculate_autocorrelated_var(mu_daily, sigma_daily, 10, rho_ar1, significance)
-print(f"Adjustment Factor added to h: {h_tilde_10 - 10:.3f}")
-print(f"1% 10-day VaR (Autocorrelated): {var_10:.2%}")
+    Returns:
+    dict: {"h", "rho", "adjusted_horizon", "var_h", "var_h_iid"} where
+    var_h_iid applies the naive square-root-of-h scaling (rho = 0).
+    """
+    sigma_1 = float(sigma_1)
+    h = int(h)
+    rho = float(rho)
+    alpha = float(alpha)
+    if sigma_1 <= 0.0:
+        raise ValueError("sigma_1 must be positive")
+    if h < 1:
+        raise ValueError("h must be at least 1")
+    if not abs(rho) < 1.0:
+        raise ValueError("rho must satisfy |rho| < 1")
+    if not 0.0 < alpha < 1.0:
+        raise ValueError("alpha must be in the open interval (0, 1)")
+
+    var_h, h_tilde = calculate_autocorrelated_var(float(mu_1), sigma_1, h, rho, alpha)
+    var_h_iid, _ = calculate_autocorrelated_var(float(mu_1), sigma_1, h, 0.0, alpha)
+    return {
+        "h": h,
+        "rho": rho,
+        "adjusted_horizon": float(h_tilde),
+        "var_h": float(var_h),
+        "var_h_iid": float(var_h_iid),
+    }
+
+
+if __name__ == "__main__":
+    # Example IV.2.1: Adjusting Normal Linear VaR for Autocorrelation
+    mu_daily = 0.0001  # 0.01% daily mean
+    sigma_daily = 0.01  # 1% daily volatility
+    rho_ar1 = 0.2  # Autocorrelation
+    significance = 0.01  # 1% VaR
+
+    print("--- Example IV.2.1: h = 250 days ---")
+    var_250, h_tilde_250 = calculate_autocorrelated_var(
+        mu_daily, sigma_daily, 250, rho_ar1, significance
+    )
+    print(f"Adjustment Factor added to h: {h_tilde_250 - 250:.3f}")
+    print(f"Adjusted Horizon (h_tilde): {h_tilde_250:.3f}")
+    print(f"Annual Volatility: {sigma_daily * np.sqrt(h_tilde_250):.2%}")
+
+    print("\n--- Example IV.2.1: h = 10 days ---")
+    var_10, h_tilde_10 = calculate_autocorrelated_var(
+        mu_daily, sigma_daily, 10, rho_ar1, significance
+    )
+    print(f"Adjustment Factor added to h: {h_tilde_10 - 10:.3f}")
+    print(f"1% 10-day VaR (Autocorrelated): {var_10:.2%}")

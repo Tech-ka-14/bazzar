@@ -1,3 +1,12 @@
+"""Higher-moment certainty equivalent approximation.
+
+Four-moment Taylor approximation of the certainty equivalent for an
+exponential-utility investor with absolute risk aversion gamma:
+CE ~ mu - (gamma/2) sigma^2 + (gamma^2/6) skew sigma^3 -
+(gamma^3/24) kurt_excess sigma^4 (Example I.6.4, Alexander 2008).
+"""
+
+
 def higher_moment_certainty_equivalent(mu, sigma, skewness, excess_kurtosis, gamma):
     """
     Approximates the Certain Equivalent (CE) incorporating up to the 4th moment
@@ -10,6 +19,40 @@ def higher_moment_certainty_equivalent(mu, sigma, skewness, excess_kurtosis, gam
 
     ce = term_mean + term_variance + term_skewness + term_kurtosis
     return ce
+
+
+def compute(mu: float, sigma: float, skewness: float, excess_kurtosis: float, gamma: float) -> dict:
+    """Standard facade: higher-moment certainty equivalent as a JSON dict.
+
+    Parameters:
+    mu (float): Expected return of the portfolio (fraction).
+    sigma (float): Volatility of the portfolio (fraction), positive.
+    skewness (float): Skewness of the return distribution.
+    excess_kurtosis (float): Excess kurtosis of the return distribution.
+    gamma (float): Investor's absolute risk aversion, non-negative.
+
+    Returns:
+    dict: {"mu", "sigma", "skewness", "excess_kurtosis", "gamma",
+    "certainty_equivalent"} with the CE in the same units as mu.
+    """
+    sigma = float(sigma)
+    gamma = float(gamma)
+    if sigma <= 0.0:
+        raise ValueError("sigma must be positive")
+    if gamma < 0.0:
+        raise ValueError("gamma must be non-negative")
+
+    ce = higher_moment_certainty_equivalent(
+        float(mu), sigma, float(skewness), float(excess_kurtosis), gamma
+    )
+    return {
+        "mu": float(mu),
+        "sigma": sigma,
+        "skewness": float(skewness),
+        "excess_kurtosis": float(excess_kurtosis),
+        "gamma": gamma,
+        "certainty_equivalent": float(ce),
+    }
 
 
 if __name__ == "__main__":

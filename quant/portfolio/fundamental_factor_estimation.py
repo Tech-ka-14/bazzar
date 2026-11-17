@@ -1,3 +1,10 @@
+"""Fundamental factor sensitivity estimation.
+
+OLS regression of an asset's returns on k fundamental factor returns
+(e.g. Market, Industry, Growth, Cap): R_i = alpha + beta' F + epsilon,
+yielding the factor betas, R-squared and the idiosyncratic specific risk.
+"""
+
 import numpy as np
 import statsmodels.api as sm
 
@@ -29,6 +36,36 @@ def estimate_fundamental_factors(asset_returns, fundamental_factors):
         "betas": betas.flatten(),
         "r_squared": float(model.rsquared),
         "specific_risk": float(np.std(model.resid, ddof=1)),  # Idiosyncratic volatility
+    }
+
+
+def compute(asset_returns, fundamental_factors) -> dict:
+    """Standard facade: fundamental factor sensitivities as a JSON dict.
+
+    Parameters:
+    asset_returns: 1-D array-like of the asset's returns (T).
+    fundamental_factors: 2-D array-like (T x k) of fundamental factor
+    returns.
+
+    Returns:
+    dict: {"n_observations", "n_factors", "alpha", "betas", "r_squared",
+    "specific_risk"} with plain floats/lists.
+    """
+    asset_returns = np.asarray(asset_returns, dtype=float).ravel()
+    fundamental_factors = np.asarray(fundamental_factors, dtype=float)
+    if fundamental_factors.ndim == 1:
+        fundamental_factors = fundamental_factors.reshape(-1, 1)
+    if asset_returns.size != fundamental_factors.shape[0] or asset_returns.size < 3:
+        raise ValueError("asset_returns must match the factor row count and have length >= 3")
+
+    results = estimate_fundamental_factors(asset_returns, fundamental_factors)
+    return {
+        "n_observations": int(asset_returns.size),
+        "n_factors": int(fundamental_factors.shape[1]),
+        "alpha": float(results["alpha"]),
+        "betas": [float(b) for b in np.asarray(results["betas"], dtype=float).ravel()],
+        "r_squared": float(results["r_squared"]),
+        "specific_risk": float(results["specific_risk"]),
     }
 
 

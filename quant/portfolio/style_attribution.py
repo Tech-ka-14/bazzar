@@ -1,3 +1,10 @@
+"""Style attribution via constrained least squares.
+
+Sharpe's returns-based style analysis: minimizes the sum of squared
+residuals of fund returns regressed on style index returns, subject to the
+style weights summing to 1 and lying in [0, 1] (no shorting).
+"""
+
 import numpy as np
 from scipy.optimize import minimize
 
@@ -38,6 +45,32 @@ def style_attribution_analysis(fund_returns, style_factors):
         raise ValueError("Optimization failed to converge.")
 
     return result.x
+
+
+def compute(fund_returns, style_factors) -> dict:
+    """Standard facade: style attribution weights as a JSON dict.
+
+    Parameters:
+    fund_returns: 1-D array-like of the fund's historical returns (T).
+    style_factors: 2-D array-like (T x k) of style index returns.
+
+    Returns:
+    dict: {"n_observations", "n_styles", "style_weights"} with the
+    constrained weights (summing to 1, each in [0, 1]) as plain floats.
+    """
+    fund_returns = np.asarray(fund_returns, dtype=float).ravel()
+    style_factors = np.asarray(style_factors, dtype=float)
+    if style_factors.ndim != 2:
+        raise ValueError("style_factors must be a 2-D array (T x k)")
+    if fund_returns.size != style_factors.shape[0] or fund_returns.size < 3:
+        raise ValueError("fund_returns must match the style row count and have length >= 3")
+
+    weights = style_attribution_analysis(fund_returns, style_factors)
+    return {
+        "n_observations": int(fund_returns.size),
+        "n_styles": int(style_factors.shape[1]),
+        "style_weights": [float(w) for w in weights],
+    }
 
 
 if __name__ == "__main__":

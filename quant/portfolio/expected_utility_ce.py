@@ -1,3 +1,10 @@
+"""Expected utility and certainty equivalent.
+
+Expected utility E[U(W)] = sum_i p_i U(w_i) over discrete wealth outcomes;
+the certainty equivalent is U^{-1}(E[U(W)]), the guaranteed wealth giving
+the same utility as the risky prospect (Examples I.6.1-I.6.2, Alexander 2008).
+"""
+
 import numpy as np
 
 
@@ -14,6 +21,49 @@ def certainty_equivalent(expected_util, inverse_utility_func):
     Calculates the certain equivalent (CE) given an expected utility and the inverse utility function.
     """
     return inverse_utility_func(expected_util)
+
+
+_UTILITY_FUNCTIONS = {
+    # name -> (utility, inverse utility)
+    "sqrt": (lambda w: np.sqrt(w), lambda u: u**2),
+    "log": (lambda w: np.log(w), lambda u: np.exp(u)),
+    "power2": (lambda w: w**2, lambda u: np.sqrt(u)),
+    "linear": (lambda w: w, lambda u: u),
+}
+
+
+def compute(probabilities, outcomes, utility: str = "sqrt") -> dict:
+    """Standard facade: expected utility and CE as a JSON-serializable dict.
+
+    Parameters:
+    probabilities: 1-D array-like of outcome probabilities (must sum to 1).
+    outcomes: 1-D array-like of wealth outcomes, same length.
+    utility (str): One of "sqrt", "log", "power2", "linear".
+
+    Returns:
+    dict: {"utility", "n_outcomes", "expected_utility",
+    "certainty_equivalent"} with plain floats.
+    """
+    probabilities = np.asarray(probabilities, dtype=float).ravel()
+    outcomes = np.asarray(outcomes, dtype=float).ravel()
+    if probabilities.size != outcomes.size or probabilities.size == 0:
+        raise ValueError("probabilities and outcomes must have equal non-zero length")
+    if not np.isclose(probabilities.sum(), 1.0):
+        raise ValueError("probabilities must sum to 1")
+    if utility not in _UTILITY_FUNCTIONS:
+        raise ValueError(f"utility must be one of {sorted(_UTILITY_FUNCTIONS)}")
+    if utility in ("sqrt", "log") and (outcomes <= 0).any():
+        raise ValueError(f"outcomes must be strictly positive for the {utility} utility")
+
+    u_func, inv_u_func = _UTILITY_FUNCTIONS[utility]
+    eu = expected_utility(probabilities, outcomes, u_func)
+    ce = certainty_equivalent(eu, inv_u_func)
+    return {
+        "utility": utility,
+        "n_outcomes": int(outcomes.size),
+        "expected_utility": float(eu),
+        "certainty_equivalent": float(ce),
+    }
 
 
 if __name__ == "__main__":

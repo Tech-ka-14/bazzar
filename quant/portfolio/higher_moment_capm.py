@@ -1,3 +1,12 @@
+"""Higher-moment CAPM risk parameters.
+
+Extends beta with systematic skewness and kurtosis:
+beta = E[R~_i R~_M] / E[R~_M^2],
+gamma (coskewness) = E[R~_i R~_M^2] / E[R~_M^3],
+eta (cokurtosis) = E[R~_i R~_M^3] / E[R~_M^4]
+(Equation I.6.55, Alexander 2008), where R~ denotes mean-deviated returns.
+"""
+
 import numpy as np
 
 
@@ -29,6 +38,30 @@ def calculate_higher_moment_betas(asset_returns, market_returns):
     eta_cokurt = E_R_i_R_M_3 / E_R_M_4 if E_R_M_4 != 0 else 0
 
     return beta_cov, gamma_coskew, eta_cokurt
+
+
+def compute(asset_returns, market_returns) -> dict:
+    """Standard facade: higher-moment CAPM parameters as a JSON dict.
+
+    Parameters:
+    asset_returns: 1-D array-like of the asset's returns.
+    market_returns: 1-D array-like of the market's returns, same length.
+
+    Returns:
+    dict: {"n", "beta", "coskewness", "cokurtosis"} with plain floats.
+    """
+    asset_returns = np.asarray(asset_returns, dtype=float).ravel()
+    market_returns = np.asarray(market_returns, dtype=float).ravel()
+    if asset_returns.size < 3 or asset_returns.size != market_returns.size:
+        raise ValueError("asset_returns and market_returns must have equal length >= 3")
+
+    beta, coskew, cokurt = calculate_higher_moment_betas(asset_returns, market_returns)
+    return {
+        "n": int(asset_returns.size),
+        "beta": float(beta),
+        "coskewness": float(coskew),
+        "cokurtosis": float(cokurt),
+    }
 
 
 if __name__ == "__main__":

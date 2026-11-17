@@ -1,3 +1,10 @@
+"""Linear factor model estimation for allocation.
+
+OLS regression of asset returns on k factor returns:
+R_i = alpha + beta' F + epsilon. The residual standard deviation is the
+specific risk (tracking error proxy) used in factor-based allocation.
+"""
+
 import numpy as np
 import statsmodels.api as sm
 
@@ -31,6 +38,35 @@ def estimate_factor_model(asset_returns, factor_returns):
         "betas": betas,
         "tracking_error": tracking_error,
         "r_squared": model.rsquared,
+    }
+
+
+def compute(asset_returns, factor_returns) -> dict:
+    """Standard facade: factor model estimates as a JSON-serializable dict.
+
+    Parameters:
+    asset_returns: 1-D array-like of the asset's historical returns (T).
+    factor_returns: 2-D array-like (T x k) of factor returns.
+
+    Returns:
+    dict: {"n_observations", "n_factors", "alpha", "betas",
+    "tracking_error", "r_squared"} with plain floats/lists.
+    """
+    asset_returns = np.asarray(asset_returns, dtype=float).ravel()
+    factor_returns = np.asarray(factor_returns, dtype=float)
+    if factor_returns.ndim == 1:
+        factor_returns = factor_returns.reshape(-1, 1)
+    if asset_returns.size != factor_returns.shape[0] or asset_returns.size < 3:
+        raise ValueError("asset_returns must match the factor row count and have length >= 3")
+
+    results = estimate_factor_model(asset_returns, factor_returns)
+    return {
+        "n_observations": int(asset_returns.size),
+        "n_factors": int(factor_returns.shape[1]),
+        "alpha": float(results["alpha"]),
+        "betas": [float(b) for b in np.asarray(results["betas"], dtype=float).ravel()],
+        "tracking_error": float(results["tracking_error"]),
+        "r_squared": float(results["r_squared"]),
     }
 
 
