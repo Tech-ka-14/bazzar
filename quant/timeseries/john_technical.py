@@ -78,9 +78,9 @@ class TechnicalAnalyzer:
         ema_slow = self.data[column].ewm(span=slow_period, adjust=False).mean()
 
         self.data["MACD_Line"] = ema_fast - ema_slow
-        self.data["MACD_Signal"] = self.data["MACD_Line"].ewm(
-            span=signal_period, adjust=False
-        ).mean()
+        self.data["MACD_Signal"] = (
+            self.data["MACD_Line"].ewm(span=signal_period, adjust=False).mean()
+        )
         self.data["MACD_Hist"] = self.data["MACD_Line"] - self.data["MACD_Signal"]
         return self.data
 
