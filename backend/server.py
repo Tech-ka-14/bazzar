@@ -39,7 +39,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from starlette.concurrency import run_in_threadpool
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from . import schemas
+from . import analytics_routes, schemas
 from .charts import cached_chart_png, render_candles_png, render_line_png
 from .db import get_connection, get_data_dir, get_db_path, initialize_database, load_config
 from .fetch_indices import ensure_snapshot_view
@@ -746,6 +746,9 @@ def macro() -> list[dict[str, Any]]:
 # OpenAPI schema) until the next release so older shells keep working.
 app.include_router(router, prefix="/api/v1")
 app.include_router(router, prefix="/api", include_in_schema=False)
+# P7-C (roadmap 7.3): quant analytics endpoints, same dual mount.
+app.include_router(analytics_routes.router, prefix="/api/v1")
+app.include_router(analytics_routes.router, prefix="/api", include_in_schema=False)
 
 
 def main() -> None:
