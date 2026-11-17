@@ -40,6 +40,53 @@ async function authHeaders(extra = {}) {
   return headers;
 }
 
+// Error thrown by apiGet/apiPost on non-2xx responses. Carries the HTTP
+// status and, when the body is the standard {"error": {code, message}}
+// envelope, the parsed payload — so callers can render explicit states
+// (400 bad request, 404 not synced, 422 insufficient_data) instead of ever
+// fabricating numbers.
+export class ApiError extends Error {
+  constructor(status, statusText, path, payload = null) {
+    super(`API request failed: ${status} ${statusText} (${path})`);
+    this.name = 'ApiError';
+    this.status = status;
+    this.payload = payload;
+  }
+
+  // The envelope's machine-readable code (e.g. 'insufficient_data'), or null.
+  get code() {
+    return this.payload && this.payload.error ? this.payload.error.code : null;
+  }
+
+  // The envelope's human-readable message, or null when absent.
+  get detail() {
+    return this.payload && this.payload.error ? this.payload.error.message : null;
+  }
+}
+
+// Builds an ApiError from a non-OK response, parsing the error envelope when
+// the body is JSON (non-JSON bodies yield a payload-less ApiError).
+async function toApiError(response, path) {
+  let payload = null;
+  try {
+    payload = await response.json();
+  } catch {
+    payload = null; // non-JSON error body
+  }
+  return new ApiError(response.status, response.statusText, path, payload);
+}
+
+// Shared response handling for apiGet/apiPost: throws ApiError on non-2xx,
+// parses the JSON body otherwise.
+async function parseJsonResponse(response, path) {
+  if (!response.ok) throw await toApiError(response, path);
+  try {
+    return await response.json();
+  } catch (err) {
+    throw new Error(`API returned invalid JSON (${path}): ${err.message}`);
+  }
+}
+
 // Small JSON GET helper with error handling. Throws on non-2xx or invalid JSON.
 export async function apiGet(path) {
   let response;
@@ -50,14 +97,26 @@ export async function apiGet(path) {
   } catch (err) {
     throw new Error(`API unreachable at ${API_BASE}${path}: ${err.message}`);
   }
-  if (!response.ok) {
-    throw new Error(`API request failed: ${response.status} ${response.statusText} (${path})`);
-  }
+  return parseJsonResponse(response, path);
+}
+
+// Small JSON POST helper (same auth + error handling as apiGet). Throws on
+// non-2xx or invalid JSON.
+export async function apiPost(path, body = {}) {
+  let response;
   try {
-    return await response.json();
+    response = await fetch(`${API_BASE}${path}`, {
+      method: 'POST',
+      headers: await authHeaders({
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      }),
+      body: JSON.stringify(body),
+    });
   } catch (err) {
-    throw new Error(`API returned invalid JSON (${path}): ${err.message}`);
+    throw new Error(`API unreachable at ${API_BASE}${path}: ${err.message}`);
   }
+  return parseJsonResponse(response, path);
 }
 
 // Builds a URL for a backend matplotlib PNG chart endpoint (api/v1 mount).
@@ -88,4 +147,39 @@ export async function fetchChartObjectUrl(url) {
   }
   const blob = await response.blob();
   return URL.createObjectURL(blob);
+}
+
+// --- P7-D analytics wrappers (roadmap 7.4) ----------------------------------
+// Thin wrappers over the /api/v1/analytics/* endpoints (SPEC "Local HTTP API
+// contract"). Payloads are returned unchanged — every number keeps its
+// `asOf`, `source` and `cached` fields — and failure modes surface as
+// ApiError (400 unknown method/model, 404 symbol not synced, 422
+// insufficient_data) so the UI renders explicit states, never placeholders.
+
+// GET /api/v1/analytics/var?symbol&method=historical|parametric|montecarlo&confidence
+export function getVar(symbol, method = 'historical', confidence = 0.99) {
+  const query = new URLSearchParams({
+    symbol,
+    method,
+    confidence: String(confidence),
+  });
+  return apiGet(`/api/v1/analytics/var?${query.toString()}`);
+}
+
+// GET /api/v1/analytics/volatility?symbol&model=ewma|garch
+export function getVolatility(symbol, model = 'ewma') {
+  const query = new URLSearchParams({ symbol, model });
+  return apiGet(`/api/v1/analytics/volatility?${query.toString()}`);
+}
+
+// POST /api/v1/analytics/portfolio/risk — weights: {SYMBOL: fraction, ...}
+// (must sum to 1 server-side), confidence: 0.95 | 0.99.
+export function getPortfolioRisk(weights, confidence = 0.99) {
+  return apiPost('/api/v1/analytics/portfolio/risk', { weights, confidence });
+}
+
+// GET /api/v1/analytics/backtest/var?symbol&confidence
+export function getVarBacktest(symbol, confidence = 0.99) {
+  const query = new URLSearchParams({ symbol, confidence: String(confidence) });
+  return apiGet(`/api/v1/analytics/backtest/var?${query.toString()}`);
 }
