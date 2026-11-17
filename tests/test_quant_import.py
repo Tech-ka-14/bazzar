@@ -1,17 +1,22 @@
-"""Import-purity gate for the P7 standardized quant modules.
+"""Import-purity gate for the standardized quant library (P7).
 
-Every module in STANDARDIZED_MODULES must, when imported in a fresh
-interpreter (so the import guard is genuinely exercised):
+Every module under ``quant/**`` (discovered by glob, same pattern as
+``tests/test_quant_compile.py``) must, when imported in a fresh interpreter
+(so the import guard is genuinely exercised):
 
-1. produce no stdout (no demo code runs at import time), and
-2. expose the standard ``compute`` facade.
+1. import successfully,
+2. produce no stdout (no demo code runs at import time), and
+3. expose the standard ``compute`` facade and a module docstring.
 
-``quant.api`` is the dispatch layer: it must also import silently and expose
-the five dispatch functions used by the backend analytics layer.
+Exceptions (no ``compute`` facade required):
 
-``tests/test_quant_compile.py`` remains the compile-only gate for the whole
-``quant/`` tree; this gate is stricter and applies only to modules that have
-been standardized (P7-A flagship list; P7-B extends it).
+* every ``__init__.py`` — package markers, no analytics surface;
+* ``quant.api`` — the dispatch layer; it is asserted separately below to
+  expose the dispatch functions used by the backend analytics layer.
+
+The P7-A flagship modules (``FLAGSHIP_MODULES``) were standardized first;
+they are a subset of the glob-discovered set and are pinned explicitly so a
+broken glob can never silently drop them from the gate.
 """
 
 import json
@@ -23,7 +28,8 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
-STANDARDIZED_MODULES = [
+# P7-A flagship list: pinned subset of the glob-discovered gate below.
+FLAGSHIP_MODULES = [
     "quant.risk.historical_simulation_var",
     "quant.risk.conditional_var_metrics",
     "quant.risk.normal_linear_var",
@@ -46,6 +52,7 @@ STANDARDIZED_MODULES = [
     "quant.copulas.copula_monte_carlo_var",
 ]
 
+DISPATCH_MODULE = "quant.api"
 DISPATCH_FUNCTIONS = [
     "compute_var",
     "compute_es",
@@ -53,6 +60,24 @@ DISPATCH_FUNCTIONS = [
     "compute_portfolio_risk",
     "compute_var_backtest",
 ]
+
+
+def _discover_modules() -> list[str]:
+    """All importable module names under ``quant/``, sorted."""
+    modules = []
+    for path in sorted(REPO_ROOT.glob("quant/**/*.py")):
+        if "__pycache__" in path.parts:
+            continue
+        modules.append(".".join(path.relative_to(REPO_ROOT).with_suffix("").parts))
+    return modules
+
+
+ALL_MODULES = _discover_modules()
+
+assert ALL_MODULES, "no quant modules discovered — repo layout broken?"
+
+# Modules exempt from the ``compute`` facade requirement (see module docstring).
+NO_COMPUTE_EXEMPTIONS = {m for m in ALL_MODULES if m.endswith(".__init__")} | {DISPATCH_MODULE}
 
 
 def _import_in_subprocess(module: str, attributes: list) -> dict:
@@ -65,6 +90,7 @@ def _import_in_subprocess(module: str, attributes: list) -> dict:
         "result = {\n"
         "    'stdout_empty': buf.getvalue() == '',\n"
         f"    'attributes': {{a: hasattr(mod, a) for a in {attributes!r}}},\n"
+        "    'has_docstring': bool(mod.__doc__ and mod.__doc__.strip()),\n"
         "}\n"
         "print(json.dumps(result))\n"
     )
@@ -79,15 +105,24 @@ def _import_in_subprocess(module: str, attributes: list) -> dict:
     return json.loads(proc.stdout.strip().splitlines()[-1])
 
 
-@pytest.mark.parametrize("module", STANDARDIZED_MODULES)
+def test_flagships_covered_by_discovery() -> None:
+    """The P7-A flagship modules must all be part of the glob-discovered gate."""
+    missing = [m for m in FLAGSHIP_MODULES if m not in ALL_MODULES]
+    assert not missing, f"flagship modules missing from quant/ tree: {missing}"
+
+
+@pytest.mark.parametrize("module", ALL_MODULES)
 def test_import_is_pure_and_exposes_compute(module: str) -> None:
     result = _import_in_subprocess(module, ["compute"])
     assert result["stdout_empty"], f"importing {module} wrote to stdout (demo code runs at import)"
+    assert result["has_docstring"], f"{module} is missing a module docstring"
+    if module in NO_COMPUTE_EXEMPTIONS:
+        return
     assert result["attributes"]["compute"], f"{module} does not expose the standard compute facade"
 
 
 def test_dispatch_layer_import_is_pure() -> None:
-    result = _import_in_subprocess("quant.api", DISPATCH_FUNCTIONS)
+    result = _import_in_subprocess(DISPATCH_MODULE, DISPATCH_FUNCTIONS)
     assert result["stdout_empty"], "importing quant.api wrote to stdout"
     for name in DISPATCH_FUNCTIONS:
         assert result["attributes"][name], f"quant.api does not expose {name}"
