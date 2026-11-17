@@ -1,3 +1,11 @@
+"""Parametric VaR for commodity futures desks.
+
+Position exposure vectors (theta) are mapped to a 1-day covariance
+matrix; stand-alone desk VaR is the normal linear VaR, and desk marginal
+contributions follow from the DelVaR gradient.
+Reference: Alexander (2008), Market Risk Analysis IV, Case Study IV.2.7.
+"""
+
 import numpy as np
 from scipy.stats import norm
 
@@ -57,58 +65,92 @@ def calculate_desk_marginal_var(
 # --- Executing Case Study IV.2.7 Data ---
 
 # 1. Position Setup (Table IV.2.19)
-gas_multiplier = 10_000
-gas_prices = [7.67, 7.66, 7.69, 7.70, 7.84]
-gas_contracts = [-75, -30, -10, 15, 25]
 
-silver_multiplier = 5_000
-silver_prices = [13.50, 13.39, 13.62, 13.62, 13.56]
-silver_contracts = [100, 50, 20, -50, -100]
 
-theta_gas = calculate_commodity_position_vector(gas_contracts, gas_prices, gas_multiplier)
-theta_silver = calculate_commodity_position_vector(
-    silver_contracts, silver_prices, silver_multiplier
-)
+def compute(theta, omega_1d, horizon_days: int = 10, alpha: float = 0.01) -> dict:
+    """Standard facade: stand-alone commodity desk VaR as a JSON dict.
 
-print(f"Total Nominal Exposure (Gas): ${np.sum(np.abs(theta_gas)):,.0f}")
-print(f"Total Nominal Exposure (Silver): ${np.sum(np.abs(theta_silver)):,.0f}\n")
+    Parameters:
+    theta: 1-D array-like of nominal dollar exposures per maturity.
+    omega_1d: Square 1-day covariance matrix matching len(theta).
+    horizon_days (int): Risk horizon in days.
+    alpha (float): Tail probability in (0, 1), e.g. 0.01.
 
-# 2. Mock 1-Day Covariance Matrices (In reality, derived from historical returns in Table IV.2.18)
-# We generate mock matrices structured to yield similar sub-additive results to Table IV.2.20
-np.random.seed(42)
+    Returns:
+    dict: {"method", "alpha", "horizon_days", "var"} with "var" the
+    positive monetary loss.
+    """
+    theta = np.asarray(theta, dtype=float).ravel()
+    omega = np.asarray(omega_1d, dtype=float)
+    if theta.size == 0:
+        raise ValueError("theta must contain at least one exposure")
+    if omega.shape != (theta.size, theta.size):
+        raise ValueError("omega_1d must be square with size len(theta)")
+    if not 0.0 < alpha < 1.0:
+        raise ValueError("alpha must be in the open interval (0, 1)")
 
-# Gas Covariance (High Volatility)
-vols_gas = np.array([0.587, 0.550, 0.498, 0.458, 0.418]) / np.sqrt(250)
-corr_gas = np.ones((5, 5)) * 0.90 + np.eye(5) * 0.10
-omega_gas_1d = np.outer(vols_gas, vols_gas) * corr_gas
+    var = calculate_commodity_desk_var(theta, omega, int(horizon_days), float(alpha))
+    return {
+        "method": "normal_linear",
+        "alpha": float(alpha),
+        "horizon_days": int(horizon_days),
+        "var": float(var),
+    }
 
-# Silver Covariance (Medium Volatility)
-vols_sil = np.array([0.441, 0.439, 0.427, 0.433, 0.404]) / np.sqrt(250)
-corr_sil = np.ones((5, 5)) * 0.88 + np.eye(5) * 0.12
-omega_sil_1d = np.outer(vols_sil, vols_sil) * corr_sil
 
-# 3. Calculate Stand-Alone VaR
-gas_standalone_var = calculate_commodity_desk_var(theta_gas, omega_gas_1d)
-silver_standalone_var = calculate_commodity_desk_var(theta_silver, omega_sil_1d)
+if __name__ == "__main__":
+    gas_multiplier = 10_000
+    gas_prices = [7.67, 7.66, 7.69, 7.70, 7.84]
+    gas_contracts = [-75, -30, -10, 15, 25]
 
-print(f"Stand-Alone Gas VaR: ${gas_standalone_var:,.0f}")
-print(f"Stand-Alone Silver VaR: ${silver_standalone_var:,.0f}")
-print(f"Sum of Stand-Alone VaRs: ${gas_standalone_var + silver_standalone_var:,.0f}\n")
+    silver_multiplier = 5_000
+    silver_prices = [13.50, 13.39, 13.62, 13.62, 13.56]
+    silver_contracts = [100, 50, 20, -50, -100]
 
-# 4. Aggregated Total VaR and Marginal VaR (Assuming 20% cross-correlation between Gas and Silver)
-cross_corr = 0.20
-omega_cross = np.outer(vols_gas, vols_sil) * cross_corr
+    theta_gas = calculate_commodity_position_vector(gas_contracts, gas_prices, gas_multiplier)
+    theta_silver = calculate_commodity_position_vector(
+        silver_contracts, silver_prices, silver_multiplier
+    )
 
-omega_total_1d = np.block([[omega_gas_1d, omega_cross], [omega_cross.T, omega_sil_1d]])
+    print(f"Total Nominal Exposure (Gas): ${np.sum(np.abs(theta_gas)):,.0f}")
+    print(f"Total Nominal Exposure (Silver): ${np.sum(np.abs(theta_silver)):,.0f}\n")
 
-theta_total = np.concatenate([theta_gas, theta_silver])
+    # 2. Mock 1-Day Covariance Matrices (In reality, derived from historical returns in Table IV.2.18)
+    # We generate mock matrices structured to yield similar sub-additive results to Table IV.2.20
+    np.random.seed(42)
 
-total_var, gas_marginal, silver_marginal = calculate_desk_marginal_var(
-    theta_total, omega_total_1d, split_index=5
-)
+    # Gas Covariance (High Volatility)
+    vols_gas = np.array([0.587, 0.550, 0.498, 0.458, 0.418]) / np.sqrt(250)
+    corr_gas = np.ones((5, 5)) * 0.90 + np.eye(5) * 0.10
+    omega_gas_1d = np.outer(vols_gas, vols_gas) * corr_gas
 
-print(f"Total Aggregated VaR: ${total_var:,.0f}")
-print(f"Marginal Contribution - Gas: ${gas_marginal:,.0f} ({gas_marginal / total_var:.1%})")
-print(
-    f"Marginal Contribution - Silver: ${silver_marginal:,.0f} ({silver_marginal / total_var:.1%})"
-)
+    # Silver Covariance (Medium Volatility)
+    vols_sil = np.array([0.441, 0.439, 0.427, 0.433, 0.404]) / np.sqrt(250)
+    corr_sil = np.ones((5, 5)) * 0.88 + np.eye(5) * 0.12
+    omega_sil_1d = np.outer(vols_sil, vols_sil) * corr_sil
+
+    # 3. Calculate Stand-Alone VaR
+    gas_standalone_var = calculate_commodity_desk_var(theta_gas, omega_gas_1d)
+    silver_standalone_var = calculate_commodity_desk_var(theta_silver, omega_sil_1d)
+
+    print(f"Stand-Alone Gas VaR: ${gas_standalone_var:,.0f}")
+    print(f"Stand-Alone Silver VaR: ${silver_standalone_var:,.0f}")
+    print(f"Sum of Stand-Alone VaRs: ${gas_standalone_var + silver_standalone_var:,.0f}\n")
+
+    # 4. Aggregated Total VaR and Marginal VaR (Assuming 20% cross-correlation between Gas and Silver)
+    cross_corr = 0.20
+    omega_cross = np.outer(vols_gas, vols_sil) * cross_corr
+
+    omega_total_1d = np.block([[omega_gas_1d, omega_cross], [omega_cross.T, omega_sil_1d]])
+
+    theta_total = np.concatenate([theta_gas, theta_silver])
+
+    total_var, gas_marginal, silver_marginal = calculate_desk_marginal_var(
+        theta_total, omega_total_1d, split_index=5
+    )
+
+    print(f"Total Aggregated VaR: ${total_var:,.0f}")
+    print(f"Marginal Contribution - Gas: ${gas_marginal:,.0f} ({gas_marginal / total_var:.1%})")
+    print(
+        f"Marginal Contribution - Silver: ${silver_marginal:,.0f} ({silver_marginal / total_var:.1%})"
+    )

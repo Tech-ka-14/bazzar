@@ -1,3 +1,12 @@
+"""Cornish-Fisher adjusted VaR.
+
+Adjusts the standard normal quantile for skewness and excess kurtosis via
+the Cornish-Fisher expansion, then scales to the empirical mean and
+volatility over the risk horizon.
+Reference: Alexander (2008), Market Risk Analysis IV, Equations
+IV.3.7-IV.3.8, Example IV.3.4.
+"""
+
 import numpy as np
 from scipy.stats import norm
 
@@ -51,29 +60,73 @@ def calculate_cornish_fisher_var(
 
 # Example IV.3.4: Cornish-Fisher Approximation
 # Table IV.3.11 Parameters
-mu_ann = 0.05
-vol_ann = 0.10
-skew = -0.6
-exc_kurtosis = 3.0
 
-horizon = 10
-conf_level = 0.01  # Looking at the 1% lower tail
 
-# 1. Standard Normal Linear VaR (Baseline)
-z_01 = norm.ppf(conf_level)
-normal_var = -((z_01 * vol_ann * np.sqrt(horizon / 250)) + (mu_ann * horizon / 250))
+def compute(
+    mu_annual: float,
+    vol_annual: float,
+    skewness: float,
+    excess_kurtosis: float,
+    alpha: float = 0.01,
+    h_days: int = 10,
+) -> dict:
+    """Standard facade: Cornish-Fisher VaR as a JSON-serializable dict.
 
-# 2. Cornish-Fisher Adjusted VaR
-cf_var = calculate_cornish_fisher_var(
-    alpha=conf_level,
-    mu_annual=mu_ann,
-    vol_annual=vol_ann,
-    skewness=skew,
-    excess_kurtosis=exc_kurtosis,
-    h_days=horizon,
-)
+    Parameters:
+    mu_annual, vol_annual (float): Annualized mean and volatility.
+    skewness, excess_kurtosis (float): Higher moments of returns.
+    alpha (float): Tail probability in (0, 1), e.g. 0.01.
+    h_days (int): Risk horizon in days.
 
-print("--- Example IV.3.4: Cornish-Fisher VaR ---")
-print(f"Normal Linear 1% 10-day VaR: {normal_var:.2%}")
-print(f"Cornish-Fisher 1% 10-day VaR: {cf_var:.2%}")
-print(f"Difference due to Skew & Kurtosis: {cf_var - normal_var:.2%}")
+    Returns:
+    dict: {"method", "alpha", "h_days", "var"} where "var" is the
+    positive loss fraction.
+    """
+    if vol_annual <= 0:
+        raise ValueError("vol_annual must be positive")
+    if not 0.0 < alpha < 1.0:
+        raise ValueError("alpha must be in the open interval (0, 1)")
+
+    var = calculate_cornish_fisher_var(
+        float(alpha),
+        float(mu_annual),
+        float(vol_annual),
+        float(skewness),
+        float(excess_kurtosis),
+        int(h_days),
+    )
+    return {
+        "method": "cornish_fisher",
+        "alpha": float(alpha),
+        "h_days": int(h_days),
+        "var": float(var),
+    }
+
+
+if __name__ == "__main__":
+    mu_ann = 0.05
+    vol_ann = 0.10
+    skew = -0.6
+    exc_kurtosis = 3.0
+
+    horizon = 10
+    conf_level = 0.01  # Looking at the 1% lower tail
+
+    # 1. Standard Normal Linear VaR (Baseline)
+    z_01 = norm.ppf(conf_level)
+    normal_var = -((z_01 * vol_ann * np.sqrt(horizon / 250)) + (mu_ann * horizon / 250))
+
+    # 2. Cornish-Fisher Adjusted VaR
+    cf_var = calculate_cornish_fisher_var(
+        alpha=conf_level,
+        mu_annual=mu_ann,
+        vol_annual=vol_ann,
+        skewness=skew,
+        excess_kurtosis=exc_kurtosis,
+        h_days=horizon,
+    )
+
+    print("--- Example IV.3.4: Cornish-Fisher VaR ---")
+    print(f"Normal Linear 1% 10-day VaR: {normal_var:.2%}")
+    print(f"Cornish-Fisher 1% 10-day VaR: {cf_var:.2%}")
+    print(f"Difference due to Skew & Kurtosis: {cf_var - normal_var:.2%}")

@@ -1,3 +1,11 @@
+"""Autocorrelation- and higher-moment-adjusted Sharpe ratios.
+
+Adjusts the annualization factor of volatility for first-order
+autocorrelated returns and adjusts the Sharpe ratio for skewness and
+excess kurtosis (Adjusted Sharpe Ratio ASR2 and Generalized Sharpe Ratio).
+Reference: Alexander (2008), Market Risk Analysis I, Examples I.6.12-I.6.13.
+"""
+
 import numpy as np
 
 
@@ -36,6 +44,33 @@ def generalized_sharpe_ratio(sharpe_ratio, skewness, excess_kurtosis):
 
     inside_sqrt = (sr**2) + term_skew - term_kurt
     return np.sqrt(max(0, inside_sqrt))  # Ensure non-negative before sqrt
+
+
+def compute(sharpe_ratio, skewness: float = 0.0, excess_kurtosis: float = 0.0) -> dict:
+    """Standard facade: moment-adjusted Sharpe ratios as a JSON-serializable dict.
+
+    Parameters:
+    sharpe_ratio (float): Base (annualized) Sharpe ratio.
+    skewness (float): Skewness of the return distribution.
+    excess_kurtosis (float): Excess kurtosis of the return distribution.
+
+    Returns:
+    dict: {"method", "sharpe_ratio", "skewness", "excess_kurtosis",
+    "adjusted_sharpe", "generalized_sharpe"}.
+    """
+    sr = float(sharpe_ratio)
+    skew = float(skewness)
+    kurt = float(excess_kurtosis)
+    asr2 = adjusted_sharpe_ratio_higher_moments(sr, skew, kurt)
+    gsr = generalized_sharpe_ratio(sr, skew, kurt)
+    return {
+        "method": "adjusted_sharpe",
+        "sharpe_ratio": sr,
+        "skewness": skew,
+        "excess_kurtosis": kurt,
+        "adjusted_sharpe": float(asr2),
+        "generalized_sharpe": float(gsr),
+    }
 
 
 if __name__ == "__main__":

@@ -1,3 +1,11 @@
+"""EWMA specific VaR from a dynamic factor model.
+
+EWMA estimates of the factor variance and covariance give a dynamic
+beta; the EWMA volatility of the residuals drives the specific
+(idiosyncratic) VaR of the portfolio.
+Reference: Alexander (2008), Market Risk Analysis IV, Equation IV.2.48.
+"""
+
 import numpy as np
 import pandas as pd
 from scipy.stats import norm
@@ -37,15 +45,57 @@ def calculate_ewma_specific_var(
 
 
 # Simulated market data (100 days)
-np.random.seed(42)
-market_returns = pd.Series(np.random.normal(0, 0.01, 100))
-# Portfolio has beta of ~1.2 plus some idiosyncratic noise
-port_returns = pd.Series(1.2 * market_returns + np.random.normal(0, 0.005, 100))
 
-# Execute EWMA Specific VaR calculation
-spec_var, current_beta = calculate_ewma_specific_var(
-    port_returns, market_returns, lam=0.95, alpha=0.01, h_days=10
-)
 
-print(f"Current EWMA Beta Estimate: {current_beta:.4f}")
-print(f"1% 10-day EWMA Specific VaR (Percentage): {spec_var:.4%}")
+def compute(
+    portfolio_returns, factor_returns, lam: float = 0.95, alpha: float = 0.01, h_days: int = 10
+) -> dict:
+    """Standard facade: EWMA specific VaR as a JSON-serializable dict.
+
+    Parameters:
+    portfolio_returns: 1-D array-like of portfolio returns.
+    factor_returns: 1-D array-like of factor (market) returns, same length.
+    lam (float): EWMA smoothing constant in (0, 1).
+    alpha (float): Tail probability in (0, 1), e.g. 0.01.
+    h_days (int): Risk horizon in days.
+
+    Returns:
+    dict: {"method", "alpha", "h_days", "n", "specific_var", "beta"}.
+    """
+    portfolio_returns = pd.Series(np.asarray(portfolio_returns, dtype=float).ravel())
+    factor_returns = pd.Series(np.asarray(factor_returns, dtype=float).ravel())
+    if portfolio_returns.size < 2:
+        raise ValueError("portfolio_returns must contain at least two observations")
+    if factor_returns.size != portfolio_returns.size:
+        raise ValueError("factor_returns must have the same length as portfolio_returns")
+    if not 0.0 < lam < 1.0:
+        raise ValueError("lam must be in the open interval (0, 1)")
+    if not 0.0 < alpha < 1.0:
+        raise ValueError("alpha must be in the open interval (0, 1)")
+
+    spec_var, beta = calculate_ewma_specific_var(
+        portfolio_returns, factor_returns, float(lam), float(alpha), int(h_days)
+    )
+    return {
+        "method": "ewma_specific",
+        "alpha": float(alpha),
+        "h_days": int(h_days),
+        "n": int(portfolio_returns.size),
+        "specific_var": float(spec_var),
+        "beta": float(beta),
+    }
+
+
+if __name__ == "__main__":
+    np.random.seed(42)
+    market_returns = pd.Series(np.random.normal(0, 0.01, 100))
+    # Portfolio has beta of ~1.2 plus some idiosyncratic noise
+    port_returns = pd.Series(1.2 * market_returns + np.random.normal(0, 0.005, 100))
+
+    # Execute EWMA Specific VaR calculation
+    spec_var, current_beta = calculate_ewma_specific_var(
+        port_returns, market_returns, lam=0.95, alpha=0.01, h_days=10
+    )
+
+    print(f"Current EWMA Beta Estimate: {current_beta:.4f}")
+    print(f"1% 10-day EWMA Specific VaR (Percentage): {spec_var:.4%}")

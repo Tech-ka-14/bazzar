@@ -1,3 +1,11 @@
+"""Bivariate normal-mixture portfolio component moments.
+
+Mixing law, component expectations and variances of a linear two-asset
+portfolio whose returns follow a bivariate normal mixture.
+Reference: Alexander (2008), Market Risk Analysis I, Equations
+I.3.102-I.3.104.
+"""
+
 import numpy as np
 
 
@@ -34,3 +42,32 @@ def mixture_portfolio_components(w, pi_1, pi_2, mu_vectors, cov_matrices):
         component_variances.append(c_var)
 
     return mixing_law, component_means, component_variances
+
+
+def compute(w, pi_1, pi_2, mu_vectors, cov_matrices) -> dict:
+    """Standard facade: mixture portfolio component moments as a JSON dict.
+
+    Parameters:
+    w (float): Weight of asset 1 (weight of asset 2 is 1 - w).
+    pi_1, pi_2 (float): Regime-1 probabilities of each asset in (0, 1).
+    mu_vectors: List of 4 mean vectors (length 2 each).
+    cov_matrices: List of 4 covariance matrices (2x2 each).
+
+    Returns:
+    dict: {"method", "mixing_law", "component_means",
+    "component_variances"} (all plain lists/floats).
+    """
+    if not 0.0 < float(pi_1) < 1.0 or not 0.0 < float(pi_2) < 1.0:
+        raise ValueError("pi_1 and pi_2 must be in the open interval (0, 1)")
+    if len(mu_vectors) != 4 or len(cov_matrices) != 4:
+        raise ValueError("mu_vectors and cov_matrices must each have 4 entries")
+
+    mixing_law, means, variances = mixture_portfolio_components(
+        float(w), float(pi_1), float(pi_2), mu_vectors, cov_matrices
+    )
+    return {
+        "method": "bivariate_normal_mixture",
+        "mixing_law": [float(x) for x in mixing_law],
+        "component_means": [float(x) for x in means],
+        "component_variances": [float(x) for x in variances],
+    }

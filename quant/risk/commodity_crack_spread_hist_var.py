@@ -1,3 +1,11 @@
+"""Historical VaR for a crack-spread commodity futures portfolio.
+
+Stand-alone and total historical VaR of heating-oil and unleaded-gas
+futures positions from empirical quantiles of historical spread-change
+P&L, scaled by the contract multiplier and square root of the horizon.
+Reference: Alexander (2008), Market Risk Analysis IV, Section IV.2.
+"""
+
 import numpy as np
 
 
@@ -45,22 +53,70 @@ def calculate_commodity_historical_var(
 
 
 # Conceptual Setup: 6 maturities for Heating Oil (HO) and 6 for Unleaded (UL)
-mock_ho_contracts = np.array([-50, -20, 10, 30, 40, 50])
-mock_ul_contracts = np.array([100, 50, 20, -10, -30, -50])
 
-np.random.seed(100)
-# Mock historical changes (highly positively correlated spreads)
-market_factor = np.random.normal(0, 0.02, (1000, 1))
-mock_ho_changes = market_factor + np.random.normal(0, 0.005, (1000, 6))
-mock_ul_changes = market_factor * 1.2 + np.random.normal(0, 0.005, (1000, 6))
 
-va_ho, va_ul, va_total = calculate_commodity_historical_var(
-    mock_ho_contracts, mock_ho_changes, mock_ul_contracts, mock_ul_changes
-)
+def compute(
+    ho_contracts,
+    ho_spread_changes,
+    ul_contracts,
+    ul_spread_changes,
+    multiplier: float = 1000.0,
+    alpha: float = 0.01,
+    horizon_days: int = 10,
+) -> dict:
+    """Standard facade: crack-spread historical VaR as a JSON dict.
 
-print("--- Crack Spread Historical VaR Decomposition ---")
-print(f"Heating Oil (HO) Stand-Alone VaR: ${va_ho:,.0f}")
-print(f"Unleaded Gas (UL) Stand-Alone VaR: ${va_ul:,.0f}")
-print(f"Sum of Stand-Alone VaRs: ${va_ho + va_ul:,.0f}")
-print("-" * 40)
-print(f"Total Portfolio VaR (Diversified): ${va_total:,.0f}")
+    Parameters:
+    ho_contracts, ul_contracts: 1-D array-like contract counts per maturity.
+    ho_spread_changes, ul_spread_changes: (n_scenarios, n_maturities)
+    historical daily absolute spread changes.
+    multiplier (float): Contract size multiplier.
+    alpha (float): Tail probability in (0, 1).
+    horizon_days (int): Risk horizon in days.
+
+    Returns:
+    dict: {"method", "alpha", "horizon_days", "var_ho", "var_ul",
+    "var_total"} with positive monetary losses.
+    """
+    if not 0.0 < alpha < 1.0:
+        raise ValueError("alpha must be in the open interval (0, 1)")
+
+    var_ho, var_ul, var_total = calculate_commodity_historical_var(
+        np.asarray(ho_contracts, dtype=float),
+        np.asarray(ho_spread_changes, dtype=float),
+        np.asarray(ul_contracts, dtype=float),
+        np.asarray(ul_spread_changes, dtype=float),
+        multiplier=float(multiplier),
+        alpha=float(alpha),
+        horizon_days=int(horizon_days),
+    )
+    return {
+        "method": "historical",
+        "alpha": float(alpha),
+        "horizon_days": int(horizon_days),
+        "var_ho": float(var_ho),
+        "var_ul": float(var_ul),
+        "var_total": float(var_total),
+    }
+
+
+if __name__ == "__main__":
+    mock_ho_contracts = np.array([-50, -20, 10, 30, 40, 50])
+    mock_ul_contracts = np.array([100, 50, 20, -10, -30, -50])
+
+    np.random.seed(100)
+    # Mock historical changes (highly positively correlated spreads)
+    market_factor = np.random.normal(0, 0.02, (1000, 1))
+    mock_ho_changes = market_factor + np.random.normal(0, 0.005, (1000, 6))
+    mock_ul_changes = market_factor * 1.2 + np.random.normal(0, 0.005, (1000, 6))
+
+    va_ho, va_ul, va_total = calculate_commodity_historical_var(
+        mock_ho_contracts, mock_ho_changes, mock_ul_contracts, mock_ul_changes
+    )
+
+    print("--- Crack Spread Historical VaR Decomposition ---")
+    print(f"Heating Oil (HO) Stand-Alone VaR: ${va_ho:,.0f}")
+    print(f"Unleaded Gas (UL) Stand-Alone VaR: ${va_ul:,.0f}")
+    print(f"Sum of Stand-Alone VaRs: ${va_ho + va_ul:,.0f}")
+    print("-" * 40)
+    print(f"Total Portfolio VaR (Diversified): ${va_total:,.0f}")

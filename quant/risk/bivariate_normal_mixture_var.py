@@ -1,3 +1,12 @@
+"""Normal-mixture VaR of a linear portfolio mapped to two risk factors.
+
+The h-day portfolio return is a four-component normal mixture; VaR is the
+negative of the alpha-quantile of the mixture distribution, solved
+numerically from the mixture CDF.
+Reference: Alexander (2008), Market Risk Analysis IV, Equations
+IV.2.75-IV.2.77, Example IV.2.24.
+"""
+
 import numpy as np
 from scipy.optimize import brentq
 from scipy.stats import norm
@@ -96,39 +105,97 @@ def calculate_bivariate_mixture_var(
 # Example IV.2.24: Normal Mixture VaR - Risk Factor Level
 # Defining the parameters from Table IV.2.30
 
-theta_vec = np.array([0.8, 1.0])
 
-# Risk Factor 1 (Tail / Core)
-pi1 = 0.02
-mu11, mu12 = -3.00, 0.02
-sig11, sig12 = 0.75, 0.15
+def compute(theta, pi, mu, sigma, rho, alpha: float = 0.01, h_days: int = 10) -> dict:
+    """Standard facade: bivariate normal-mixture VaR as a JSON-serializable dict.
 
-# Risk Factor 2 (Tail / Core)
-pi2 = 0.03
-mu21, mu22 = -2.00, 0.025
-sig21, sig22 = 0.65, 0.18
+    Parameters:
+    theta: Array-like of 2 portfolio sensitivities to the risk factors.
+    pi: (pi_1, pi_2) tail-regime probabilities of the two risk factors.
+    mu: (mu_11, mu_12, mu_21, mu_22) tail/core means of factors 1 and 2.
+    sigma: (sigma_11, sigma_12, sigma_21, sigma_22) tail/core vols.
+    rho: (rho_1, rho_2, rho_3, rho_4) cross-correlations per joint regime.
+    alpha (float): Tail probability in (0, 1), e.g. 0.01.
+    h_days (int): Risk horizon in days.
 
-# Cross-correlations
-r1, r2, r3, r4 = 0.30, 0.0, 0.0, 0.80
+    Returns:
+    dict: {"method", "alpha", "h_days", "var"} where "var" is the
+    positive loss fraction.
+    """
+    theta = np.asarray(theta, dtype=float).ravel()
+    if theta.size != 2:
+        raise ValueError("theta must contain exactly 2 sensitivities")
+    if len(pi) != 2 or len(mu) != 4 or len(sigma) != 4 or len(rho) != 4:
+        raise ValueError("pi must have 2, mu/sigma/rho must have 4 entries each")
+    if not 0.0 < alpha < 1.0:
+        raise ValueError("alpha must be in the open interval (0, 1)")
 
-var_10d = calculate_bivariate_mixture_var(
-    pi1,
-    mu11,
-    mu12,
-    sig11,
-    sig12,
-    pi2,
-    mu21,
-    mu22,
-    sig21,
-    sig22,
-    r1,
-    r2,
-    r3,
-    r4,
-    theta=theta_vec,
-    alpha=0.01,
-    h_days=10,
-)
+    pi_1, pi_2 = (float(x) for x in pi)
+    mu_11, mu_12, mu_21, mu_22 = (float(x) for x in mu)
+    s11, s12, s21, s22 = (float(x) for x in sigma)
+    r1, r2, r3, r4 = (float(x) for x in rho)
 
-print(f"1% 10-day Normal Mixture VaR (4-Component Portfolio): {var_10d:.2%}")
+    var = calculate_bivariate_mixture_var(
+        pi_1,
+        mu_11,
+        mu_12,
+        s11,
+        s12,
+        pi_2,
+        mu_21,
+        mu_22,
+        s21,
+        s22,
+        r1,
+        r2,
+        r3,
+        r4,
+        theta=theta,
+        alpha=float(alpha),
+        h_days=int(h_days),
+    )
+    return {
+        "method": "normal_mixture",
+        "alpha": float(alpha),
+        "h_days": int(h_days),
+        "var": float(var),
+    }
+
+
+if __name__ == "__main__":
+    theta_vec = np.array([0.8, 1.0])
+
+    # Risk Factor 1 (Tail / Core)
+    pi1 = 0.02
+    mu11, mu12 = -3.00, 0.02
+    sig11, sig12 = 0.75, 0.15
+
+    # Risk Factor 2 (Tail / Core)
+    pi2 = 0.03
+    mu21, mu22 = -2.00, 0.025
+    sig21, sig22 = 0.65, 0.18
+
+    # Cross-correlations
+    r1, r2, r3, r4 = 0.30, 0.0, 0.0, 0.80
+
+    var_10d = calculate_bivariate_mixture_var(
+        pi1,
+        mu11,
+        mu12,
+        sig11,
+        sig12,
+        pi2,
+        mu21,
+        mu22,
+        sig21,
+        sig22,
+        r1,
+        r2,
+        r3,
+        r4,
+        theta=theta_vec,
+        alpha=0.01,
+        h_days=10,
+    )
+
+    print(f"1% 10-day Normal Mixture VaR (4-Component Portfolio): {var_10d:.2%}")

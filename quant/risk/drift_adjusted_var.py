@@ -1,3 +1,12 @@
+"""Drift-adjusted VaR with discounted risk statistics.
+
+Parametric normal VaR over a horizon of months, discounting the mean and
+volatility at the risk-free rate and adjusting for the expected excess
+return (drift).
+Reference: Alexander (2008), Market Risk Analysis IV, Example IV.1.6,
+Table IV.1.3.
+"""
+
 import numpy as np
 from scipy.stats import norm
 
@@ -52,15 +61,60 @@ def calculate_drift_adjusted_var(
 
 
 # Example IV.1.6: 12-month horizon with 10% expected return and 5% risk free rate
-horizon_m = 12.0
-mean_ret = 0.10
-vol = 0.20
-rf_rate = 0.05
-conf = 0.99
 
-var_base, var_adj, diff = calculate_drift_adjusted_var(mean_ret, vol, rf_rate, horizon_m, conf)
 
-print(f"Risk Horizon: {horizon_m} months")
-print(f"1% VaR (Zero Mean): {var_base:.4%}")
-print(f"1% VaR (Drift Adjusted): {var_adj:.4%}")
-print(f"Reduction in VaR (Difference): {diff:.4%}")
+def compute(
+    mean_return_annual: float,
+    vol_annual: float,
+    risk_free_rate: float = 0.0,
+    horizon_months: float = 12.0,
+    confidence: float = 0.99,
+) -> dict:
+    """Standard facade: drift-adjusted VaR as a JSON-serializable dict.
+
+    Parameters:
+    mean_return_annual (float): Expected annual return.
+    vol_annual (float): Annual volatility (positive).
+    risk_free_rate (float): Continuous annual risk-free rate.
+    horizon_months (float): Risk horizon in months.
+    confidence (float): Confidence level in (0, 1), e.g. 0.99.
+
+    Returns:
+    dict: {"method", "confidence", "horizon_months", "var",
+    "var_drift_adjusted", "difference"} with positive loss fractions.
+    """
+    if vol_annual <= 0:
+        raise ValueError("vol_annual must be positive")
+    if not 0.0 < confidence < 1.0:
+        raise ValueError("confidence must be in the open interval (0, 1)")
+
+    var_base, var_adj, diff = calculate_drift_adjusted_var(
+        float(mean_return_annual),
+        float(vol_annual),
+        float(risk_free_rate),
+        float(horizon_months),
+        float(confidence),
+    )
+    return {
+        "method": "drift_adjusted",
+        "confidence": float(confidence),
+        "horizon_months": float(horizon_months),
+        "var": float(var_base),
+        "var_drift_adjusted": float(var_adj),
+        "difference": float(diff),
+    }
+
+
+if __name__ == "__main__":
+    horizon_m = 12.0
+    mean_ret = 0.10
+    vol = 0.20
+    rf_rate = 0.05
+    conf = 0.99
+
+    var_base, var_adj, diff = calculate_drift_adjusted_var(mean_ret, vol, rf_rate, horizon_m, conf)
+
+    print(f"Risk Horizon: {horizon_m} months")
+    print(f"1% VaR (Zero Mean): {var_base:.4%}")
+    print(f"1% VaR (Drift Adjusted): {var_adj:.4%}")
+    print(f"Reduction in VaR (Difference): {diff:.4%}")
