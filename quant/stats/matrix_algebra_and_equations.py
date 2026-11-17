@@ -1,3 +1,10 @@
+"""Matrix algebra and linear equation systems.
+
+Transpose, determinant and inverse of a square matrix, and the solution of
+simultaneous linear systems Ax = b. Reference: Alexander (2008), Vol. I,
+Examples I.2.3-I.2.4.
+"""
+
 import numpy as np
 
 
@@ -45,6 +52,38 @@ def solve_linear_system(A_list, b_list):
     except np.linalg.LinAlgError:
         print("\nThe coefficient matrix A is singular. The system does not have a unique solution.")
         return None
+
+
+def compute(data, b=None) -> dict:
+    """Standard facade: matrix analysis and linear-system solution.
+
+    Parameters:
+    data: matrix (list of lists).
+    b (array-like, optional): right-hand side for solving Ax = b (square A).
+
+    Returns:
+    dict: {"square", "transpose", "determinant", "inverse"} plus
+    {"solution"} when b is given (None values when undefined).
+    """
+    A = np.asarray(data, dtype=float)
+    if A.ndim != 2:
+        raise ValueError("data must be a 2-D matrix")
+
+    out = {"transpose": A.T.tolist()}
+    if A.shape[0] != A.shape[1]:
+        if b is not None:
+            raise ValueError("solving Ax = b requires a square matrix")
+        out.update({"square": False, "determinant": None, "inverse": None})
+        return out
+
+    determinant = float(np.linalg.det(A))
+    out["square"] = True
+    out["determinant"] = determinant
+    out["inverse"] = None if np.isclose(determinant, 0.0) else np.linalg.inv(A).tolist()
+    if b is not None:
+        solution = solve_linear_system(A, np.asarray(b, dtype=float))
+        out["solution"] = None if solution is None else np.asarray(solution).tolist()
+    return out
 
 
 # --- Testing with Examples from the text ---

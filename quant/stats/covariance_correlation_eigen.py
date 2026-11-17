@@ -1,3 +1,10 @@
+"""Eigenvalue analysis of covariance and correlation matrices.
+
+A valid correlation matrix must be positive semi-definite; eigenvalues of the
+covariance matrix V = DCD differ from those of C but share its definiteness.
+Reference: Alexander (2008), Vol. I, Examples I.2.13-I.2.14.
+"""
+
 import numpy as np
 
 
@@ -35,6 +42,33 @@ def compare_eigenvalues_V_and_C(volatilities, correlation_matrix):
     print("\n--- Eigenvalue Comparison ---")
     print(f"Eigenvalues of Correlation Matrix C: {np.round(np.sort(eigenvalues_C)[::-1], 4)}")
     print(f"Eigenvalues of Covariance Matrix V: {np.round(np.sort(eigenvalues_V)[::-1], 4)}")
+
+
+def compute(data) -> dict:
+    """Standard facade: correlation-matrix validity via eigenvalues.
+
+    Parameters:
+    data: square matrix (list of lists) of candidate correlations.
+
+    Returns:
+    dict: {"n", "eigenvalues", "positive_semidefinite",
+    "valid_correlation_matrix"}.
+    """
+    C = np.asarray(data, dtype=float)
+    if C.ndim != 2 or C.shape[0] != C.shape[1]:
+        raise ValueError("data must be a square matrix")
+
+    eigenvalues = np.linalg.eigvals(C)
+    if np.any(np.abs(eigenvalues.imag) > 1e-9):
+        raise ValueError("matrix has complex eigenvalues; not a valid correlation matrix")
+    ordered = sorted(eigenvalues.real.tolist(), reverse=True)
+    valid = bool(np.all(eigenvalues.real >= -1e-9))
+    return {
+        "n": int(C.shape[0]),
+        "eigenvalues": [float(v) for v in ordered],
+        "positive_semidefinite": valid,
+        "valid_correlation_matrix": valid,
+    }
 
 
 # --- Testing with Examples from the text ---

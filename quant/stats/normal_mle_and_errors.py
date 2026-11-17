@@ -1,3 +1,10 @@
+"""Maximum likelihood estimation for the normal distribution.
+
+MLEs of the mean and variance (the variance MLE divides by n, not n - 1)
+with standard errors from the diagonal of the inverse information matrix.
+Reference: Alexander (2008), Vol. I.
+"""
+
 import numpy as np
 
 
@@ -32,12 +39,37 @@ def normal_mle_standard_errors(mle_variance, n):
     return se_mean, se_variance
 
 
-# Example Usage
-sample_data = np.array([0.01, -0.02, 0.015, 0.005, -0.01])
-n_obs = len(sample_data)
+def compute(data) -> dict:
+    """Standard facade: normal MLE estimates and standard errors.
 
-mean_est, var_est = normal_mle_parameters(sample_data)
-se_mu, se_var = normal_mle_standard_errors(var_est, n_obs)
+    Parameters:
+    data: 1-D array-like of observations (at least 2).
 
-print(f"MLE Mean: {mean_est:.4f} (SE: {se_mu:.4f})")
-print(f"MLE Variance: {var_est:.6f} (SE: {se_var:.6f})")
+    Returns:
+    dict: {"n", "mle_mean", "mle_variance", "se_mean", "se_variance"}.
+    """
+    arr = np.asarray(data, dtype=float).ravel()
+    if arr.size < 2:
+        raise ValueError("data must contain at least 2 observations")
+
+    mean_est, var_est = normal_mle_parameters(arr)
+    se_mean, se_variance = normal_mle_standard_errors(var_est, arr.size)
+    return {
+        "n": int(arr.size),
+        "mle_mean": float(mean_est),
+        "mle_variance": float(var_est),
+        "se_mean": float(se_mean),
+        "se_variance": float(se_variance),
+    }
+
+
+if __name__ == "__main__":
+    # Example Usage
+    sample_data = np.array([0.01, -0.02, 0.015, 0.005, -0.01])
+    n_obs = len(sample_data)
+
+    mean_est, var_est = normal_mle_parameters(sample_data)
+    se_mu, se_var = normal_mle_standard_errors(var_est, n_obs)
+
+    print(f"MLE Mean: {mean_est:.4f} (SE: {se_mu:.4f})")
+    print(f"MLE Variance: {var_est:.6f} (SE: {se_var:.6f})")

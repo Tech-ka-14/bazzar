@@ -1,3 +1,10 @@
+"""Bivariate discrete probability distributions.
+
+Computes marginal expectations, variances, covariance and correlation from a
+joint probability matrix. Reference: Alexander (2008), Vol. I,
+Examples I.3.10-I.3.11.
+"""
+
 import numpy as np
 
 
@@ -38,6 +45,45 @@ def calculate_bivariate_statistics(x_values, y_values, joint_probabilities):
     print(f"Correlation: {correlation:.4f}")
 
     return mu_X, mu_Y, var_X, var_Y, covariance, correlation
+
+
+def compute(data, y_values=None, joint_probabilities=None) -> dict:
+    """Standard facade: bivariate discrete statistics as a JSON-serializable dict.
+
+    Parameters:
+    data: sequence of x values.
+    y_values: sequence of y values.
+    joint_probabilities: (len(y), len(x)) joint probability matrix summing to 1.
+
+    Returns:
+    dict: {"e_x", "e_y", "var_x", "var_y", "covariance", "correlation"}.
+    """
+    if y_values is None or joint_probabilities is None:
+        raise ValueError("y_values and joint_probabilities are required")
+    X = np.asarray(data, dtype=float).ravel()
+    Y = np.asarray(y_values, dtype=float).ravel()
+    P = np.asarray(joint_probabilities, dtype=float)
+    if P.shape != (Y.size, X.size):
+        raise ValueError("joint_probabilities must have shape (len(y_values), len(data))")
+    if not np.isclose(P.sum(), 1.0):
+        raise ValueError("joint probabilities must sum to 1")
+
+    P_X = np.sum(P, axis=0)
+    P_Y = np.sum(P, axis=1)
+    mu_X = float(np.sum(X * P_X))
+    mu_Y = float(np.sum(Y * P_Y))
+    var_X = float(np.sum((X**2) * P_X) - mu_X**2)
+    var_Y = float(np.sum((Y**2) * P_Y) - mu_Y**2)
+    X_grid, Y_grid = np.meshgrid(X, Y)
+    covariance = float(np.sum(X_grid * Y_grid * P) - mu_X * mu_Y)
+    return {
+        "e_x": mu_X,
+        "e_y": mu_Y,
+        "var_x": var_X,
+        "var_y": var_Y,
+        "covariance": covariance,
+        "correlation": float(covariance / np.sqrt(var_X * var_Y)),
+    }
 
 
 # --- Testing with Examples I.3.10 and I.3.11 from the text ---

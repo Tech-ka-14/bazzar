@@ -1,3 +1,10 @@
+"""Symbolic differentiation and stationary-point analysis.
+
+Differentiates a function string with sympy and classifies its stationary
+points via the second-derivative test. Reference: Alexander (2008), Vol. I,
+Examples I.1.2-I.1.3.
+"""
+
 import sympy as sp
 
 
@@ -45,6 +52,47 @@ def analyze_function(expression_str):
             nature = "Saddle Point / Inconclusive (Requires further check)"
 
         print(f"x = {point_val:.4f} | f''(x) = {eval_2nd_deriv:.4f} -> {nature}")
+
+
+def compute(data) -> dict:
+    """Standard facade: derivatives and stationary points as a JSON dict.
+
+    Parameters:
+    data (str): function of x, e.g. "x**3 - 7*x**2 + 14*x - 8"
+    (``log`` is the natural logarithm).
+
+    Returns:
+    dict: {"function", "first_derivative", "second_derivative",
+    "stationary_points": [{"x", "second_derivative", "nature"}]}.
+    Complex stationary points are excluded.
+    """
+    x = sp.Symbol("x", real=True)
+    f_x = sp.sympify(data)
+    f_prime = sp.diff(f_x, x)
+    f_double_prime = sp.diff(f_prime, x)
+
+    stationary_points = []
+    for point in sp.solve(f_prime, x):
+        point_val = complex(sp.N(point))
+        if abs(point_val.imag) > 1e-9:
+            continue
+        second = float(f_double_prime.subs(x, point).evalf())
+        if second < 0:
+            nature = "local_maximum"
+        elif second > 0:
+            nature = "local_minimum"
+        else:
+            nature = "inconclusive"
+        stationary_points.append(
+            {"x": point_val.real, "second_derivative": second, "nature": nature}
+        )
+
+    return {
+        "function": str(f_x),
+        "first_derivative": str(f_prime),
+        "second_derivative": str(f_double_prime),
+        "stationary_points": stationary_points,
+    }
 
 
 # --- Testing with examples from the text ---

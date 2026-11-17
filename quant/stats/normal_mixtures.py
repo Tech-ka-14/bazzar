@@ -1,3 +1,10 @@
+"""Normal mixture distributions.
+
+Variance and kurtosis of a zero-mean normal mixture (Equations I.3.45-I.3.46)
+and the mixture CDF (Equation I.3.51). Reference: Alexander (2008), Vol. I,
+Examples I.3.8-I.3.9.
+"""
+
 import scipy.stats as stats
 
 
@@ -32,6 +39,45 @@ def normal_mixture_cdf(x, weights, means, std_devs):
         cumulative_prob += w * prob
 
     return cumulative_prob
+
+
+def compute(data, std_devs=None, means=None, x=None) -> dict:
+    """Standard facade: zero-mean normal-mixture statistics.
+
+    Parameters:
+    data: 1-D array-like of component weights summing to 1.
+    std_devs: 1-D array-like of component standard deviations.
+    means, x (optional): component means and evaluation point; when both are
+    given, the mixture CDF at x is included.
+
+    Returns:
+    dict: {"variance", "std_dev", "kurtosis"} plus {"cdf_at_x"} when means
+    and x are provided.
+    """
+    if std_devs is None:
+        raise ValueError("std_devs is required")
+    weights = [float(w) for w in data]
+    std_devs = [float(s) for s in std_devs]
+    if len(weights) != len(std_devs):
+        raise ValueError("weights and std_devs must have equal length")
+    if len(weights) < 2:
+        raise ValueError("at least two mixture components are required")
+    if any(s <= 0.0 for s in std_devs):
+        raise ValueError("std_devs must be positive")
+
+    variances = [s**2 for s in std_devs]
+    variance, kurtosis = normal_mixture_stats(weights, variances)
+    out = {
+        "variance": float(variance),
+        "std_dev": float(variance**0.5),
+        "kurtosis": float(kurtosis),
+    }
+    if means is not None and x is not None:
+        means = [float(m) for m in means]
+        if len(means) != len(weights):
+            raise ValueError("means must match the number of components")
+        out["cdf_at_x"] = float(normal_mixture_cdf(float(x), weights, means, std_devs))
+    return out
 
 
 # --- Testing with Examples I.3.8 and I.3.9 ---

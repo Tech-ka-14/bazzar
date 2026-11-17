@@ -1,3 +1,10 @@
+"""Theoretical moments of a normal mixture distribution.
+
+Non-central moments are probability-weighted averages of the component
+moments; central moments, skewness and kurtosis follow Equations
+IV.2.73-IV.2.74. Reference: Alexander (2008), Vol. IV, Example IV.2.21.
+"""
+
 import numpy as np
 
 
@@ -24,15 +31,51 @@ def calculate_mixture_moments(weights: np.ndarray, means: np.ndarray, vols: np.n
     return mu, sigma, skewness, kurtosis
 
 
-# Example IV.2.21: Parameters from Table IV.2.26 (Annualized)
-weights_annual = np.array([0.34003, 1 - 0.34003])
-means_annual = np.array([-0.3107, 0.2052])
-vols_annual = np.array([0.2649, 0.0952])
+def compute(data, means=None, vols=None) -> dict:
+    """Standard facade: theoretical normal-mixture moments as a JSON dict.
 
-mu, vol, skew, kurt = calculate_mixture_moments(weights_annual, means_annual, vols_annual)
+    Parameters:
+    data: 1-D array-like of component weights summing to 1.
+    means: 1-D array-like of component means.
+    vols: 1-D array-like of component volatilities (positive).
 
-print("--- Theoretical Moments of the Normal Mixture ---")
-print(f"Mean: {mu:.4%}")
-print(f"Volatility: {vol:.4%}")
-print(f"Skewness: {skew:.4f}")
-print(f"Excess Kurtosis: {kurt - 3:.4f}")
+    Returns:
+    dict: {"mean", "volatility", "skewness", "kurtosis", "excess_kurtosis"}.
+    """
+    if means is None or vols is None:
+        raise ValueError("means and vols are required")
+    weights = np.asarray(data, dtype=float).ravel()
+    means = np.asarray(means, dtype=float).ravel()
+    vols = np.asarray(vols, dtype=float).ravel()
+    if not (weights.shape == means.shape == vols.shape):
+        raise ValueError("weights, means and vols must have equal length")
+    if weights.size < 2:
+        raise ValueError("at least two mixture components are required")
+    if not np.isclose(weights.sum(), 1.0):
+        raise ValueError("weights must sum to 1")
+    if np.any(vols <= 0.0):
+        raise ValueError("vols must be positive")
+
+    mu, sigma, skewness, kurtosis = calculate_mixture_moments(weights, means, vols)
+    return {
+        "mean": float(mu),
+        "volatility": float(sigma),
+        "skewness": float(skewness),
+        "kurtosis": float(kurtosis),
+        "excess_kurtosis": float(kurtosis - 3.0),
+    }
+
+
+if __name__ == "__main__":
+    # Example IV.2.21: Parameters from Table IV.2.26 (Annualized)
+    weights_annual = np.array([0.34003, 1 - 0.34003])
+    means_annual = np.array([-0.3107, 0.2052])
+    vols_annual = np.array([0.2649, 0.0952])
+
+    mu, vol, skew, kurt = calculate_mixture_moments(weights_annual, means_annual, vols_annual)
+
+    print("--- Theoretical Moments of the Normal Mixture ---")
+    print(f"Mean: {mu:.4%}")
+    print(f"Volatility: {vol:.4%}")
+    print(f"Skewness: {skew:.4f}")
+    print(f"Excess Kurtosis: {kurt - 3:.4f}")

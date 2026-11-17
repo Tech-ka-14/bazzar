@@ -1,3 +1,10 @@
+"""Descriptive sample statistics.
+
+First four moments of a sample: mean, variance (biased and unbiased),
+skewness and excess kurtosis with small-sample corrections. Reference:
+Alexander (2008), Vol. I, Section I.3.
+"""
+
 import numpy as np
 import scipy.stats as stats
 
@@ -40,6 +47,32 @@ def calculate_sample_moments(data_array):
     print(f"Excess Kurtosis: {excess_kurtosis:.4f}")
 
     return mean, unbiased_variance, skewness, excess_kurtosis
+
+
+def compute(data) -> dict:
+    """Standard facade: first four sample moments as a JSON dict.
+
+    Parameters:
+    data: 1-D array-like with at least 4 observations.
+
+    Returns:
+    dict: {"n", "mean", "variance_biased", "variance", "std", "skewness",
+    "excess_kurtosis"} (variance/std use the unbiased n-1 estimator).
+    """
+    arr = np.asarray(data, dtype=float).ravel()
+    if arr.size < 4:
+        raise ValueError("data must contain at least 4 observations")
+
+    variance = float(np.var(arr, ddof=1))
+    return {
+        "n": int(arr.size),
+        "mean": float(np.mean(arr)),
+        "variance_biased": float(np.var(arr, ddof=0)),
+        "variance": variance,
+        "std": float(np.sqrt(variance)),
+        "skewness": float(stats.skew(arr, bias=False)),
+        "excess_kurtosis": float(stats.kurtosis(arr, fisher=True, bias=False)),
+    }
 
 
 # --- Testing with a hypothetical returns sample ---

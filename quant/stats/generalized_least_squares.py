@@ -1,3 +1,10 @@
+"""Generalized least squares with known error covariance.
+
+GLS estimator beta = (X' Omega^-1 X)^-1 X' Omega^-1 y and its covariance
+matrix, efficient under heteroscedastic or autocorrelated errors with known
+structure Omega.
+"""
+
 import numpy as np
 
 
@@ -34,6 +41,39 @@ def generalized_least_squares(X, y, Omega):
     cov_matrix_GLS = sigma_squared * X_Omega_X_inv
 
     return beta_hat_GLS.flatten(), cov_matrix_GLS, sigma_squared
+
+
+def compute(data, X=None, Omega=None) -> dict:
+    """Standard facade: GLS fit as a JSON-serializable dict.
+
+    Parameters:
+    data: 1-D array-like of T dependent-variable observations.
+    X: T x k explanatory matrix (including a constant column if desired).
+    Omega: T x T known covariance structure of the errors.
+
+    Returns:
+    dict: {"coefficients", "standard_errors", "covariance_matrix",
+    "sigma_squared"} with plain floats/lists.
+    """
+    if X is None or Omega is None:
+        raise ValueError("X and Omega are required")
+    y = np.asarray(data, dtype=float).ravel()
+    X = np.asarray(X, dtype=float)
+    Omega = np.asarray(Omega, dtype=float)
+    if X.ndim != 2 or X.shape[0] != y.size:
+        raise ValueError("X must be a 2-D matrix with one row per observation")
+    if Omega.shape != (y.size, y.size):
+        raise ValueError("Omega must be a T x T matrix matching the sample size")
+    if X.shape[0] <= X.shape[1]:
+        raise ValueError("more observations than parameters are required")
+
+    beta, cov, sigma_squared = generalized_least_squares(X, y, Omega)
+    return {
+        "coefficients": np.asarray(beta, dtype=float).tolist(),
+        "standard_errors": np.sqrt(np.diag(cov)).tolist(),
+        "covariance_matrix": np.asarray(cov, dtype=float).tolist(),
+        "sigma_squared": float(sigma_squared),
+    }
 
 
 if __name__ == "__main__":

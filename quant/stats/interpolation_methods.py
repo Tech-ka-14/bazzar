@@ -1,3 +1,10 @@
+"""Interpolation methods.
+
+Standard linear interpolation and an exact quadratic fit through three
+points, as used for volatility smiles. Reference: Alexander (2008), Vol. I,
+Example I.5.5.
+"""
+
 import numpy as np
 
 
@@ -25,6 +32,40 @@ def fit_quadratic_smile(x_points, y_points):
     # Solve for coefficients [a, b, c]
     coefficients = np.linalg.inv(X_matrix) @ y_points
     return coefficients
+
+
+def compute(data, y_points=None, x=None) -> dict:
+    """Standard facade: interpolate at x from 2 (linear) or 3 (quadratic) points.
+
+    Parameters:
+    data: array-like of 2 or 3 x-coordinates of the known points.
+    y_points: array-like of the corresponding y values.
+    x (float): evaluation point.
+
+    Returns:
+    dict: {"method", "x", "value"} plus {"coefficients": [a, b, c]} for the
+    quadratic fit.
+    """
+    if y_points is None or x is None:
+        raise ValueError("y_points and x are required")
+    xs = np.asarray(data, dtype=float).ravel()
+    ys = np.asarray(y_points, dtype=float).ravel()
+    if xs.shape != ys.shape:
+        raise ValueError("data and y_points must have equal length")
+    x = float(x)
+
+    if xs.size == 2:
+        value = linear_interpolation(x, xs[0], ys[0], xs[1], ys[1])
+        return {"method": "linear", "x": x, "value": float(value)}
+    if xs.size == 3:
+        a, b, c = fit_quadratic_smile(xs, ys)
+        return {
+            "method": "quadratic",
+            "x": x,
+            "value": float(a * x**2 + b * x + c),
+            "coefficients": [float(a), float(b), float(c)],
+        }
+    raise ValueError("exactly 2 (linear) or 3 (quadratic) points are supported")
 
 
 if __name__ == "__main__":

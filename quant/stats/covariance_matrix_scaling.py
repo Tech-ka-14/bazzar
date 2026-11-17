@@ -1,3 +1,9 @@
+"""Covariance matrix scaling over time.
+
+Under i.i.d. returns the h-period covariance matrix is V_h = h * V_1.
+Reference: Alexander (2008), Vol. II, Example II.3.14.
+"""
+
 import numpy as np
 
 
@@ -13,6 +19,26 @@ def scale_covariance_matrix(V_1, h):
     numpy.ndarray: The h-period covariance matrix.
     """
     return V_1 * h
+
+
+def compute(data, h=1) -> dict:
+    """Standard facade: scale a 1-period covariance matrix to h periods.
+
+    Parameters:
+    data: square 1-period covariance matrix (list of lists).
+    h (int): number of periods (>= 1).
+
+    Returns:
+    dict: {"horizon", "scaled_covariance"}.
+    """
+    V = np.asarray(data, dtype=float)
+    if V.ndim != 2 or V.shape[0] != V.shape[1]:
+        raise ValueError("data must be a square covariance matrix")
+    if int(h) < 1:
+        raise ValueError("h must be a positive integer")
+
+    scaled = scale_covariance_matrix(V, int(h))
+    return {"horizon": int(h), "scaled_covariance": np.asarray(scaled).tolist()}
 
 
 if __name__ == "__main__":

@@ -1,3 +1,10 @@
+"""Power series for the exponential and natural logarithm.
+
+exp(x) = sum x^n / n! and ln(1+x) = sum (-1)^(n-1) x^n / n (for -1 < x <= 1);
+the linear approximation ln(1+x) ~ x for small x. Reference: Alexander
+(2008), Vol. I.
+"""
+
 import math
 
 
@@ -35,6 +42,32 @@ def simple_ln_approximation(x):
     Provides the simple linear approximation ln(1+x) ≈ x for very small x.
     """
     return x
+
+
+def compute(data, num_terms=10) -> dict:
+    """Standard facade: power-series approximations at a point.
+
+    Parameters:
+    data (float): evaluation point x.
+    num_terms (int): number of series terms (>= 1).
+
+    Returns:
+    dict: {"x", "num_terms", "exp_series"} plus {"ln1p_series",
+    "ln1p_linear"} when -1 < x <= 1.
+    """
+    x = float(data)
+    if int(num_terms) < 1:
+        raise ValueError("num_terms must be a positive integer")
+
+    out = {
+        "x": x,
+        "num_terms": int(num_terms),
+        "exp_series": float(exp_power_series(x, int(num_terms))),
+    }
+    if -1.0 < x <= 1.0:
+        out["ln1p_series"] = float(ln_power_series(x, int(num_terms)))
+        out["ln1p_linear"] = float(simple_ln_approximation(x))
+    return out
 
 
 # --- Testing with examples from the text ---

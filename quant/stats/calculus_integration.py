@@ -1,3 +1,9 @@
+"""Definite integration, symbolic and numerical.
+
+Evaluates definite integrals symbolically with sympy and numerically with
+scipy.integrate.quad. Reference: Alexander (2008), Vol. I, Example I.1.4.
+"""
+
 import scipy.integrate as spi
 import sympy as sp
 
@@ -24,6 +30,29 @@ def numerical_definite_integral(func, a, b):
     # quad returns the integral value and an estimate of the absolute error
     result, error = spi.quad(func, a, b)
     return result
+
+
+def compute(data, a=0.0, b=1.0) -> dict:
+    """Standard facade: definite integral of an expression from a to b.
+
+    Parameters:
+    data (str): function of x, e.g. "2*x + x**2".
+    a, b (float): integration limits.
+
+    Returns:
+    dict: {"expression", "a", "b", "symbolic", "numerical"}.
+    """
+    x = sp.Symbol("x")
+    f_x = sp.sympify(data)
+    symbolic = symbolic_definite_integral(data, a, b)
+    numerical = numerical_definite_integral(sp.lambdify(x, f_x, "numpy"), a, b)
+    return {
+        "expression": str(f_x),
+        "a": float(a),
+        "b": float(b),
+        "symbolic": float(symbolic),
+        "numerical": float(numerical),
+    }
 
 
 # --- Testing with Example I.1.4 from the text ---

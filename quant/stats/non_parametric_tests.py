@@ -1,3 +1,9 @@
+"""Non-parametric goodness-of-fit statistics.
+
+Kolmogorov-Smirnoff statistic sup|F1 - F2| and a tail-weighted
+Anderson-Darling statistic sup |Fe - Fh| / sqrt(Fh (1 - Fh)).
+"""
+
 import numpy as np
 
 
@@ -33,3 +39,33 @@ def anderson_darling_statistic(f_empirical_values, f_hypothesized_values):
 
     ad_stat = np.max(numerator / denominator)
     return ad_stat
+
+
+def compute(data, f2_cdf_values=None, hypothesized_cdf_values=None) -> dict:
+    """Standard facade: KS and Anderson-Darling statistics.
+
+    Parameters:
+    data: 1-D array-like of empirical CDF values F1 (or Fe).
+    f2_cdf_values: optional second CDF sample for the KS statistic.
+    hypothesized_cdf_values: optional hypothesized CDF for the
+    Anderson-Darling statistic.
+
+    Returns:
+    dict: with "ks_statistic" and/or "anderson_darling_statistic".
+    """
+    f1 = np.asarray(data, dtype=float).ravel()
+    if f1.size < 2:
+        raise ValueError("data must contain at least 2 CDF values")
+
+    out = {}
+    if f2_cdf_values is not None:
+        out["ks_statistic"] = float(
+            kolmogorov_smirnoff_statistic(f1, np.asarray(f2_cdf_values, dtype=float))
+        )
+    if hypothesized_cdf_values is not None:
+        out["anderson_darling_statistic"] = float(
+            anderson_darling_statistic(f1, np.asarray(hypothesized_cdf_values, dtype=float))
+        )
+    if not out:
+        raise ValueError("provide f2_cdf_values and/or hypothesized_cdf_values")
+    return out
