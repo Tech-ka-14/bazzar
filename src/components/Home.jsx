@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { theme } from '../theme.js';
 import { apiGet } from '../api.js';
 import SearchInput from './SearchInput.jsx';
+import PortfolioRiskCard from './PortfolioRiskCard.jsx';
 
 export default function Home() {
   const [portfolio, setPortfolio] = useState([]);
@@ -175,6 +176,9 @@ export default function Home() {
           )}
         </div>
       </section>
+
+      {/* Portfolio Risk analytics (P7-D): weights → /api/v1/analytics/portfolio/risk */}
+      <PortfolioRiskCard className="lg:col-span-2" />
     </div>
   );
 }
