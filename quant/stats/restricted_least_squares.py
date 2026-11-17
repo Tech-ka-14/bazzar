@@ -1,3 +1,10 @@
+"""Restricted least squares under linear constraints.
+
+Restricted OLS for R*beta = q with the exact F-test comparing restricted and
+unrestricted residual sums of squares (Equation I.4.48). Reference:
+Alexander (2008), Vol. I.
+"""
+
 import numpy as np
 import scipy.stats as stats
 
@@ -63,32 +70,73 @@ def restricted_ols_estimation(y_data, X_matrix, R_matrix, q_vector):
 #     beta_1 + beta_3 = 0
 #    -beta_1 + beta_2 + 2*beta_3 = 2
 
-# This translates to the R matrix and q vector:
-R = [[1, -1, 0], [1, 0, 1], [-1, 1, 2]]
-q = [0, 0, 2]
 
-# Let's create some dummy data to run through the solver
-np.random.seed(42)
-T_obs = 100
-X_dummy = np.random.normal(0, 1, (T_obs, 3))
-# True model where beta = [1, 1, -1] (This perfectly satisfies H0)
-Y_dummy = X_dummy @ np.array([1, 1, -1]) + np.random.normal(0, 0.5, T_obs)
+def compute(data, X_matrix=None, R_matrix=None, q_vector=None) -> dict:
+    """Standard facade: restricted OLS and F-test as a JSON dict.
 
-print("--- Testing Multiple Linear Restrictions (R*beta = q) ---")
-results = restricted_ols_estimation(Y_dummy, X_dummy, R, q)
+    Parameters:
+    data: 1-D array-like of T dependent-variable observations.
+    X_matrix: T x k design matrix (including a constant column if desired).
+    R_matrix: p x k restriction matrix.
+    q_vector: length-p restriction vector.
 
-print("\nUnrestricted Coefficients:")
-print(np.round(results["beta_unrestricted"], 4))
-print(f"Unrestricted RSS: {results['rss_unrestricted']:.4f}")
+    Returns:
+    dict: {"beta_unrestricted", "rss_unrestricted", "beta_restricted",
+    "rss_restricted", "f_statistic", "p_value"} with plain floats/lists.
+    """
+    if X_matrix is None or R_matrix is None or q_vector is None:
+        raise ValueError("X_matrix, R_matrix and q_vector are required")
+    y = np.asarray(data, dtype=float).ravel()
+    X = np.asarray(X_matrix, dtype=float)
+    R = np.asarray(R_matrix, dtype=float)
+    q = np.asarray(q_vector, dtype=float).ravel()
+    if X.ndim != 2 or X.shape[0] != y.size:
+        raise ValueError("X_matrix must be a 2-D matrix with one row per observation")
+    if R.ndim != 2 or R.shape[1] != X.shape[1]:
+        raise ValueError("R_matrix must have one column per coefficient")
+    if q.shape != (R.shape[0],):
+        raise ValueError("q_vector must have one entry per restriction")
+    if X.shape[0] <= X.shape[1]:
+        raise ValueError("more observations than parameters are required")
 
-print("\nRestricted Coefficients (Forced to obey H0):")
-print(np.round(results["beta_restricted"], 4))
-print(f"Restricted RSS: {results['rss_restricted']:.4f}")
+    results = restricted_ols_estimation(y, X, R, q)
+    return {
+        "beta_unrestricted": np.asarray(results["beta_unrestricted"], dtype=float).tolist(),
+        "rss_unrestricted": float(results["rss_unrestricted"]),
+        "beta_restricted": np.asarray(results["beta_restricted"], dtype=float).tolist(),
+        "rss_restricted": float(results["rss_restricted"]),
+        "f_statistic": float(results["f_statistic"]),
+        "p_value": float(results["p_value"]),
+    }
 
-print(f"\nF-Statistic: {results['f_statistic']:.4f}")
-print(f"P-Value: {results['p_value']:.4f}")
 
-if results["p_value"] > 0.05:
-    print("Conclusion: Fail to reject H0. The restrictions are statistically valid.")
-else:
-    print("Conclusion: Reject H0. The restrictions significantly harm the model fit.")
+if __name__ == "__main__":
+    # This translates to the R matrix and q vector:
+    R = [[1, -1, 0], [1, 0, 1], [-1, 1, 2]]
+    q = [0, 0, 2]
+
+    # Let's create some dummy data to run through the solver
+    np.random.seed(42)
+    T_obs = 100
+    X_dummy = np.random.normal(0, 1, (T_obs, 3))
+    # True model where beta = [1, 1, -1] (This perfectly satisfies H0)
+    Y_dummy = X_dummy @ np.array([1, 1, -1]) + np.random.normal(0, 0.5, T_obs)
+
+    print("--- Testing Multiple Linear Restrictions (R*beta = q) ---")
+    results = restricted_ols_estimation(Y_dummy, X_dummy, R, q)
+
+    print("\nUnrestricted Coefficients:")
+    print(np.round(results["beta_unrestricted"], 4))
+    print(f"Unrestricted RSS: {results['rss_unrestricted']:.4f}")
+
+    print("\nRestricted Coefficients (Forced to obey H0):")
+    print(np.round(results["beta_restricted"], 4))
+    print(f"Restricted RSS: {results['rss_restricted']:.4f}")
+
+    print(f"\nF-Statistic: {results['f_statistic']:.4f}")
+    print(f"P-Value: {results['p_value']:.4f}")
+
+    if results["p_value"] > 0.05:
+        print("Conclusion: Fail to reject H0. The restrictions are statistically valid.")
+    else:
+        print("Conclusion: Reject H0. The restrictions significantly harm the model fit.")

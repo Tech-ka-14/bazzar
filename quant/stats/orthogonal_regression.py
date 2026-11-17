@@ -1,3 +1,10 @@
+"""Orthogonal (PCA) regression.
+
+Regresses y on the principal components of X and rotates the estimates back
+to the original coordinates, stabilizing estimation under multicollinearity.
+Reference: Alexander (2008), Vol. I.
+"""
+
 import numpy as np
 
 
@@ -65,6 +72,39 @@ def orthogonal_regression(X, y):
         "cov_beta_original": cov_beta_original,
         "s_squared": s_squared,
         "W_tilde": W_tilde,
+    }
+
+
+def compute(data, X=None) -> dict:
+    """Standard facade: orthogonal (PCA) regression as a JSON dict.
+
+    Parameters:
+    data: 1-D array-like of T dependent-variable observations.
+    X: T x k explanatory matrix (without a constant column); k >= 2 is
+    required for the PCA rotation.
+
+    Returns:
+    dict: {"coefficients", "pca_coefficients", "standard_errors",
+    "s_squared"}; coefficients are in the original coordinates with the
+    intercept first.
+    """
+    if X is None:
+        raise ValueError("X is required")
+    y = np.asarray(data, dtype=float).ravel()
+    X = np.asarray(X, dtype=float)
+    if X.ndim != 2 or X.shape[0] != y.size:
+        raise ValueError("X must be a 2-D matrix with one row per observation")
+    if X.shape[1] < 2:
+        raise ValueError("at least 2 explanatory variables are required")
+    if X.shape[0] <= X.shape[1] + 1:
+        raise ValueError("more observations than parameters are required")
+
+    results = orthogonal_regression(X, y)
+    return {
+        "coefficients": np.asarray(results["beta_hat_original"], dtype=float).tolist(),
+        "pca_coefficients": np.asarray(results["beta_hat_PCA"], dtype=float).tolist(),
+        "standard_errors": np.sqrt(np.diag(results["cov_beta_original"])).tolist(),
+        "s_squared": float(results["s_squared"]),
     }
 
 

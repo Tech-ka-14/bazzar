@@ -1,3 +1,10 @@
+"""PCA factor model for asset returns.
+
+Extracts statistical risk factors (principal components) from a T x m
+returns matrix via the eigen decomposition of its covariance or correlation
+matrix. Reference: Alexander (2008), Vol. II.
+"""
+
 import numpy as np
 
 
@@ -49,6 +56,35 @@ def perform_pca(returns_matrix, use_correlation=False):
         "eigenvectors": eigenvectors,
         "principal_components": principal_components,
         "explained_variance_ratio": explained_variance_ratio,
+    }
+
+
+def compute(data, use_correlation=False) -> dict:
+    """Standard facade: PCA factor extraction as a JSON-serializable dict.
+
+    Parameters:
+    data: T x m matrix of historical returns (T observations, m assets).
+    use_correlation (bool): PCA on the correlation matrix instead of the
+    covariance matrix.
+
+    Returns:
+    dict: {"n_observations", "n_factors", "eigenvalues",
+    "explained_variance_ratio", "eigenvectors"}; eigenvectors (factor
+    loadings) are the columns of the returned matrix.
+    """
+    R = np.asarray(data, dtype=float)
+    if R.ndim != 2 or R.shape[0] < 2 or R.shape[1] < 1:
+        raise ValueError("data must be a T x m matrix with T >= 2")
+
+    results = perform_pca(R, use_correlation=bool(use_correlation))
+    return {
+        "n_observations": int(R.shape[0]),
+        "n_factors": int(R.shape[1]),
+        "eigenvalues": np.asarray(results["eigenvalues"], dtype=float).tolist(),
+        "explained_variance_ratio": np.asarray(
+            results["explained_variance_ratio"], dtype=float
+        ).tolist(),
+        "eigenvectors": np.asarray(results["eigenvectors"], dtype=float).tolist(),
     }
 
 

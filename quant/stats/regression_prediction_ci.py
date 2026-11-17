@@ -1,3 +1,10 @@
+"""Prediction confidence interval for a multivariate regression.
+
+Point prediction y_hat_0 = x_0' beta_hat with prediction-error variance
+s^2 (1 + x_0' (X'X)^-1 x_0). Reference: Alexander (2008), Vol. I,
+Example I.4.11.
+"""
+
 import numpy as np
 import scipy.stats as stats
 
@@ -38,6 +45,51 @@ def prediction_confidence_interval(x_0, beta_hat, s_squared, XX_inv, df, confide
     upper_bound = y_hat_0 + margin_of_error
 
     return float(y_hat_0), float(lower_bound), float(upper_bound), float(se_pred)
+
+
+def compute(
+    data, beta_hat=None, s_squared=None, XX_inv=None, df=None, confidence_level=0.90
+) -> dict:
+    """Standard facade: regression point prediction and confidence interval.
+
+    Parameters:
+    data: scenario vector x_0 of explanatory values (constant included).
+    beta_hat: estimated coefficient vector (same length as x_0).
+    s_squared (float): estimated regression error variance (positive).
+    XX_inv: the (X'X)^-1 matrix.
+    df (int): degrees of freedom (T - k).
+    confidence_level (float): confidence level in (0, 1).
+
+    Returns:
+    dict: {"prediction", "lower", "upper", "standard_error",
+    "confidence_level"}.
+    """
+    if beta_hat is None or s_squared is None or XX_inv is None or df is None:
+        raise ValueError("beta_hat, s_squared, XX_inv and df are required")
+    x_0 = np.asarray(data, dtype=float).ravel()
+    beta = np.asarray(beta_hat, dtype=float).ravel()
+    XX_inv = np.asarray(XX_inv, dtype=float)
+    if x_0.shape != beta.shape:
+        raise ValueError("x_0 and beta_hat must have equal length")
+    if XX_inv.shape != (x_0.size, x_0.size):
+        raise ValueError("XX_inv must be square with dimension len(x_0)")
+    if float(s_squared) <= 0.0:
+        raise ValueError("s_squared must be positive")
+    if int(df) < 1:
+        raise ValueError("df must be a positive integer")
+    if not 0.0 < confidence_level < 1.0:
+        raise ValueError("confidence_level must be in the open interval (0, 1)")
+
+    prediction, lower, upper, standard_error = prediction_confidence_interval(
+        x_0, beta, float(s_squared), XX_inv, int(df), float(confidence_level)
+    )
+    return {
+        "prediction": float(prediction),
+        "lower": float(lower),
+        "upper": float(upper),
+        "standard_error": float(standard_error),
+        "confidence_level": float(confidence_level),
+    }
 
 
 # --- Example I.4.11 Implementation ---

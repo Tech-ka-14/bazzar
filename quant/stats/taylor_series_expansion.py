@@ -1,3 +1,10 @@
+"""Taylor series expansion of a function.
+
+n-th order Taylor polynomial of an expression around a point, computed with
+sympy's series expansion. Reference: Alexander (2008), Vol. I,
+Example I.1.11.
+"""
+
 import sympy as sp
 
 
@@ -25,6 +32,33 @@ def calculate_taylor_expansion(expression_str, point, order):
     print(taylor_poly)
 
     return taylor_poly
+
+
+def compute(data, point=0.0, order=3) -> dict:
+    """Standard facade: Taylor expansion as a JSON-serializable dict.
+
+    Parameters:
+    data (str): function of x, e.g. "x**3 - 2*log(x)" (``log`` is ln).
+    point (float): expansion point x0.
+    order (int): degree of the Taylor polynomial (>= 1).
+
+    Returns:
+    dict: {"function", "point", "order", "expansion"} with the polynomial
+    rendered as a string.
+    """
+    if int(order) < 1:
+        raise ValueError("order must be a positive integer")
+
+    x = sp.Symbol("x")
+    f_x = sp.sympify(data)
+    taylor_series = sp.series(f_x, x, float(point), int(order) + 1)
+    taylor_poly = taylor_series.removeO()
+    return {
+        "function": str(f_x),
+        "point": float(point),
+        "order": int(order),
+        "expansion": str(taylor_poly),
+    }
 
 
 # --- Testing with Example I.1.11 from the text ---

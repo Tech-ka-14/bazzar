@@ -1,3 +1,10 @@
+"""Regression residual diagnostics.
+
+Durbin-Watson statistic for autocorrelation and White's heteroscedasticity
+test (T * R^2 of the auxiliary regression, chi-squared under H0).
+Reference: Alexander (2008), Vol. I, Examples I.4.12-I.4.13.
+"""
+
 import numpy as np
 import scipy.stats as stats
 
@@ -60,6 +67,41 @@ def whites_heteroscedasticity_test(X, residuals):
     p_value = 1 - stats.chi2.cdf(test_statistic, degrees_of_freedom)
 
     return test_statistic, p_value, degrees_of_freedom
+
+
+def compute(data, X=None) -> dict:
+    """Standard facade: residual diagnostics as a JSON-serializable dict.
+
+    Parameters:
+    data: 1-D array-like of OLS residuals (at least 3).
+    X: optional T x k design matrix (constant included) for White's test.
+
+    Returns:
+    dict: {"n", "durbin_watson"} plus {"white_statistic", "white_p_value",
+    "white_df", "heteroscedastic_at_5pct"} when X is given.
+    """
+    residuals = np.asarray(data, dtype=float).ravel()
+    if residuals.size < 3:
+        raise ValueError("at least 3 residuals are required")
+
+    out = {
+        "n": int(residuals.size),
+        "durbin_watson": float(durbin_watson_test(residuals)),
+    }
+    if X is not None:
+        X = np.asarray(X, dtype=float)
+        if X.ndim != 2 or X.shape[0] != residuals.size:
+            raise ValueError("X must be a 2-D matrix with one row per residual")
+        stat, p_value, df = whites_heteroscedasticity_test(X, residuals)
+        out.update(
+            {
+                "white_statistic": float(stat),
+                "white_p_value": float(p_value),
+                "white_df": int(df),
+                "heteroscedastic_at_5pct": bool(p_value < 0.05),
+            }
+        )
+    return out
 
 
 if __name__ == "__main__":

@@ -1,3 +1,10 @@
+"""Eigen properties of symmetric matrices.
+
+Analytic eigensystem of a 2x2 correlation matrix (eigenvalues 1 +/- r) and
+verification that eigenvectors of a symmetric matrix are orthogonal
+(W^-1 = W'). Reference: Alexander (2008), Vol. I.
+"""
+
 import numpy as np
 
 
@@ -52,6 +59,33 @@ def verify_orthogonality(matrix_list):
 
     if np.allclose(W_inv, W_trans):
         print("-> Verified: W^(-1) is equal to W' (W is an orthogonal matrix).")
+
+
+def compute(data) -> dict:
+    """Standard facade: eigensystem of a symmetric matrix as a JSON dict.
+
+    Parameters:
+    data: symmetric square matrix (list of lists).
+
+    Returns:
+    dict: {"eigenvalues", "eigenvectors", "orthogonal_eigenvectors"} sorted
+    by descending eigenvalue; eigenvectors are the matrix columns.
+    """
+    A = np.asarray(data, dtype=float)
+    if A.ndim != 2 or A.shape[0] != A.shape[1]:
+        raise ValueError("data must be a square matrix")
+    if not np.allclose(A, A.T):
+        raise ValueError("data must be symmetric")
+
+    eigenvalues, W = np.linalg.eigh(A)
+    idx = np.argsort(eigenvalues)[::-1]
+    eigenvalues = eigenvalues[idx]
+    W = W[:, idx]
+    return {
+        "eigenvalues": eigenvalues.tolist(),
+        "eigenvectors": W.tolist(),
+        "orthogonal_eigenvectors": bool(np.allclose(np.linalg.inv(W), W.T)),
+    }
 
 
 # --- Testing the properties ---

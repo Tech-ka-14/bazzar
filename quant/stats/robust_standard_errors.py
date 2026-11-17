@@ -1,3 +1,9 @@
+"""White's heteroscedasticity-consistent standard errors.
+
+Robust covariance matrix T (X'X)^-1 Sigma (X'X)^-1 with
+Sigma = (1/T) sum_t e_t^2 x_t x_t' for the OLS estimators.
+"""
+
 import numpy as np
 
 
@@ -30,6 +36,30 @@ def whites_robust_covariance(X, residuals):
     robust_cov = T * (XX_inv @ Sigma @ XX_inv)
 
     return robust_cov
+
+
+def compute(data, X=None) -> dict:
+    """Standard facade: White's robust covariance and standard errors.
+
+    Parameters:
+    data: 1-D array-like of T OLS residuals.
+    X: T x k design matrix (including a constant column).
+
+    Returns:
+    dict: {"robust_covariance", "robust_standard_errors"} with plain lists.
+    """
+    if X is None:
+        raise ValueError("X is required")
+    residuals = np.asarray(data, dtype=float).ravel()
+    X = np.asarray(X, dtype=float)
+    if X.ndim != 2 or X.shape[0] != residuals.size:
+        raise ValueError("X must be a 2-D matrix with one row per residual")
+
+    robust_cov = whites_robust_covariance(X, residuals)
+    return {
+        "robust_covariance": np.asarray(robust_cov, dtype=float).tolist(),
+        "robust_standard_errors": np.sqrt(np.diag(robust_cov)).tolist(),
+    }
 
 
 if __name__ == "__main__":

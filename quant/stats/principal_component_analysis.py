@@ -1,3 +1,10 @@
+"""Principal component analysis of a multivariate dataset.
+
+Eigen decomposition of the correlation (default) or covariance matrix of a
+T x n dataset, yielding principal components P = XW and the proportion of
+variation explained.
+"""
+
 import numpy as np
 import pandas as pd
 
@@ -40,6 +47,33 @@ def perform_pca(data_matrix, use_correlation=True):
     cumulative_variance = np.cumsum(variance_explained)
 
     return sorted_eigenvalues, sorted_W, P, variance_explained, cumulative_variance
+
+
+def compute(data, use_correlation=True) -> dict:
+    """Standard facade: PCA of a T x n dataset as a JSON-serializable dict.
+
+    Parameters:
+    data: 2-D array-like of T observations across n variables (T, n >= 2).
+    use_correlation (bool): PCA on the correlation matrix (default) instead
+    of the covariance matrix.
+
+    Returns:
+    dict: {"eigenvalues", "variance_explained", "cumulative_variance",
+    "eigenvectors"}; eigenvectors are the columns of the returned matrix.
+    """
+    X = np.asarray(data, dtype=float)
+    if X.ndim != 2 or min(X.shape) < 2:
+        raise ValueError("data must be a 2-D matrix with at least 2 rows and columns")
+
+    eigenvalues, W, _, variance_explained, cumulative_variance = perform_pca(
+        X, use_correlation=bool(use_correlation)
+    )
+    return {
+        "eigenvalues": np.asarray(eigenvalues, dtype=float).tolist(),
+        "variance_explained": np.asarray(variance_explained, dtype=float).tolist(),
+        "cumulative_variance": np.asarray(cumulative_variance, dtype=float).tolist(),
+        "eigenvectors": np.asarray(W, dtype=float).tolist(),
+    }
 
 
 # --- Testing with the concepts from the Case Study ---

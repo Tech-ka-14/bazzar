@@ -1,3 +1,10 @@
+"""Parametric hypothesis tests.
+
+One- and two-sample t-tests on means, a chi-squared test on a single
+variance, and an F-test for the equality of two variances. Reference:
+Alexander (2008), Vol. I, Example I.3.15.
+"""
+
 import numpy as np
 import scipy.stats as stats
 
@@ -40,16 +47,52 @@ def two_sample_f_test_variances(var1, var2, n1, n2):
     return f_stat, p_value
 
 
-# --- Recreating Example I.3.15: Testing for Equality of Means and Variances ---
-# Sample 1 stats
-n1, mean1, var1 = 25, 1.0, 3.0
-# Sample 2 stats
-n2, mean2, var2 = 35, 2.0, 8.0
+def compute(data, mean2=None, var1=None, var2=None, n1=None, n2=None) -> dict:
+    """Standard facade: two-sample tests for means and variances.
 
-print("Example I.3.15 Results:")
-f_stat, f_p_val = two_sample_f_test_variances(var1, var2, n1, n2)
-print(f"F-Statistic (Variances): {f_stat:.3f}")  # Expected: 0.375
-print(f"F-Test P-Value (lower tail): {f_p_val:.4f}")  # Expected: ~0.007
+    Parameters:
+    data (float): mean of sample 1.
+    mean2 (float): mean of sample 2.
+    var1, var2 (float): sample variances (positive).
+    n1, n2 (int): sample sizes (>= 2).
 
-t_stat = two_sample_t_test_means(mean1, mean2, var1, var2, n1, n2)
-print(f"t-Statistic (Means): {t_stat:.3f}")  # Expected: -1.697
+    Returns:
+    dict: {"t_statistic", "f_statistic", "f_p_value"} where the t-statistic
+    tests equality of means and the F-test compares variances.
+    """
+    if mean2 is None or var1 is None or var2 is None or n1 is None or n2 is None:
+        raise ValueError("mean2, var1, var2, n1 and n2 are required")
+    mean1 = float(data)
+    mean2 = float(mean2)
+    var1 = float(var1)
+    var2 = float(var2)
+    n1 = int(n1)
+    n2 = int(n2)
+    if var1 <= 0.0 or var2 <= 0.0:
+        raise ValueError("variances must be positive")
+    if n1 < 2 or n2 < 2:
+        raise ValueError("sample sizes must be at least 2")
+
+    t_stat = two_sample_t_test_means(mean1, mean2, var1, var2, n1, n2)
+    f_stat, f_p_value = two_sample_f_test_variances(var1, var2, n1, n2)
+    return {
+        "t_statistic": float(t_stat),
+        "f_statistic": float(f_stat),
+        "f_p_value": float(f_p_value),
+    }
+
+
+if __name__ == "__main__":
+    # --- Recreating Example I.3.15: Testing for Equality of Means and Variances ---
+    # Sample 1 stats
+    n1, mean1, var1 = 25, 1.0, 3.0
+    # Sample 2 stats
+    n2, mean2, var2 = 35, 2.0, 8.0
+
+    print("Example I.3.15 Results:")
+    f_stat, f_p_val = two_sample_f_test_variances(var1, var2, n1, n2)
+    print(f"F-Statistic (Variances): {f_stat:.3f}")  # Expected: 0.375
+    print(f"F-Test P-Value (lower tail): {f_p_val:.4f}")  # Expected: ~0.007
+
+    t_stat = two_sample_t_test_means(mean1, mean2, var1, var2, n1, n2)
+    print(f"t-Statistic (Means): {t_stat:.3f}")  # Expected: -1.697

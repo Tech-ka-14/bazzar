@@ -1,3 +1,10 @@
+"""Maximum likelihood fit of the Student-t degrees of freedom.
+
+Standardizes the returns and minimizes the negative log-likelihood over the
+degrees-of-freedom parameter. Reference: Alexander (2008), Vol. I,
+Example I.3.17.
+"""
+
 import numpy as np
 import scipy.optimize as optimize
 import scipy.stats as stats
@@ -50,3 +57,22 @@ def fit_student_t_mle(returns_data):
 
 # Note: To replicate Example I.3.17 exactly, you would pass the specific
 # daily log returns of the FTSE 100 from Jan 2004 to Aug 2007 into fit_student_t_mle().
+
+
+def compute(data) -> dict:
+    """Standard facade: Student-t MLE degrees-of-freedom estimate.
+
+    Parameters:
+    data: 1-D array-like of returns (at least 5, non-constant).
+
+    Returns:
+    dict: {"n", "degrees_of_freedom"}.
+    """
+    arr = np.asarray(data, dtype=float).ravel()
+    if arr.size < 5:
+        raise ValueError("at least 5 observations are required")
+    if np.std(arr, ddof=1) == 0.0:
+        raise ValueError("data must have non-zero variance")
+
+    df = fit_student_t_mle(arr)
+    return {"n": int(arr.size), "degrees_of_freedom": float(df)}

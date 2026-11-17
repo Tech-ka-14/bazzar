@@ -1,3 +1,10 @@
+"""Quadratic forms and definiteness of symmetric matrices.
+
+Evaluates x'Ax and classifies a matrix as positive (semi-)definite, negative
+(semi-)definite or indefinite via the eigenvalues of its symmetric part.
+Reference: Alexander (2008), Vol. I, Examples I.2.5-I.2.7.
+"""
+
 import numpy as np
 
 
@@ -49,6 +56,46 @@ def test_definiteness(A_list):
         print("Result: The matrix is NEGATIVE SEMI-DEFINITE.")
     else:
         print("Result: The matrix is INDEFINITE (neither positive nor negative definite).")
+
+
+def compute(data, x=None) -> dict:
+    """Standard facade: definiteness classification and quadratic form.
+
+    Parameters:
+    data: square matrix (list of lists); its symmetric part is classified.
+    x: optional vector for evaluating the quadratic form x'Ax.
+
+    Returns:
+    dict: {"definiteness", "eigenvalues"} plus {"quadratic_form"} when x is
+    given; definiteness is one of "positive_definite",
+    "positive_semidefinite", "negative_definite", "negative_semidefinite",
+    "indefinite".
+    """
+    A = np.asarray(data, dtype=float)
+    if A.ndim != 2 or A.shape[0] != A.shape[1]:
+        raise ValueError("data must be a square matrix")
+
+    B = 0.5 * (A + A.T)
+    eigenvalues = np.linalg.eigvals(B).real
+    tol = 1e-9
+    if np.all(eigenvalues > tol):
+        definiteness = "positive_definite"
+    elif np.all(eigenvalues >= -tol):
+        definiteness = "positive_semidefinite"
+    elif np.all(eigenvalues < -tol):
+        definiteness = "negative_definite"
+    elif np.all(eigenvalues <= tol):
+        definiteness = "negative_semidefinite"
+    else:
+        definiteness = "indefinite"
+
+    out = {
+        "definiteness": definiteness,
+        "eigenvalues": [float(v) for v in sorted(eigenvalues.tolist(), reverse=True)],
+    }
+    if x is not None:
+        out["quadratic_form"] = float(evaluate_quadratic_form(x, A))
+    return out
 
 
 # --- Testing with Examples from the text ---
