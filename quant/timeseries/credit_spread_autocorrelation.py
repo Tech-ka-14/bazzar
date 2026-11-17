@@ -1,48 +1,102 @@
+"""Autocorrelation of credit spread changes (iTraxx Europe).
+
+The sample autocorrelation of first differences of the iTraxx Europe 5-year
+index reveals a strong positive autocorrelation in credit-spread changes,
+motivating autocorrelation-adjusted VaR scaling.
+Reference: Alexander (2008), Market Risk Analysis IV, Section IV.2.12,
+Figure IV.2.22.
+"""
+
 import numpy as np
+import pandas as pd
 
 
-def calculate_adjusted_time_horizon(h: int, rho: float) -> float:
+def analyze_credit_spread_autocorrelation(spread_series: pd.Series, max_lags: int = 10):
     """
-    Analytically calculates the adjusted time horizon (h_tilde) for a first-order
-    autoregressive (AR1) return process using Equation IV.2.10.
+    Analyzes the autocorrelation of the first differences (changes) of a credit spread series.
+    Mimics the analysis of the iTraxx Europe 5-year index presented in Section IV.2.12.
+
+    Parameters:
+    spread_series (pd.Series): Time series of credit spreads (e.g., in basis points).
+    max_lags (int): Number of lags to evaluate.
+
+    Returns:
+    tuple: (dict of autocorrelations, the first difference series)
     """
-    if rho == 0:
-        return float(h)
+    # 1. Calculate the first differences (daily changes)
+    spread_changes = spread_series.diff().dropna()
 
-    term_1 = (h - 1) * (1 - rho)
-    term_2 = rho * (1 - rho ** (h - 1))
+    # 2. Calculate the autocorrelations
+    autocorrelations = {}
+    for lag in range(1, max_lags + 1):
+        # Using pandas built-in autocorr which calculates the Pearson correlation
+        # of the series with its lagged self
+        autocorrelations[f"Lag {lag}"] = spread_changes.autocorr(lag=lag)
 
-    adjustment_factor = 2 * (rho / (1 - rho) ** 2) * (term_1 - term_2)
-    h_tilde = h + adjustment_factor
-
-    return h_tilde
+    return autocorrelations, spread_changes
 
 
-def scale_volatility(daily_vol: float, h_days: int, rho: float = 0.0) -> float:
+def compute(spread_series, max_lags: int = 10) -> dict:
+    """Standard facade: credit-spread change autocorrelations as a JSON dict.
+
+    Parameters:
+    spread_series: 1-D array-like of credit-spread levels (at least
+    max_lags + 2 observations).
+    max_lags (int): Number of lags to evaluate (>= 1).
+
+    Returns:
+    dict: {"n_changes", "lag_1_autocorrelation", "autocorrelations"} where
+    autocorrelations maps "lag_<k>" to the sample autocorrelation of the
+    spread changes.
     """
-    Scales daily volatility to an h-day horizon, accounting for serial correlation.
-    """
-    h_tilde = calculate_adjusted_time_horizon(h_days, rho)
-    return daily_vol * np.sqrt(h_tilde)
+    series = pd.Series(np.asarray(spread_series, dtype=float).ravel())
+    max_lags = int(max_lags)
+    if max_lags < 1:
+        raise ValueError("max_lags must be at least 1")
+    if series.size < max_lags + 2:
+        raise ValueError("spread_series is too short for the requested lags")
+
+    autocorrelations, changes = analyze_credit_spread_autocorrelation(series, max_lags)
+    result = {"n_changes": int(changes.size), "lag_1_autocorrelation": None}
+    for lag in range(1, max_lags + 1):
+        key = f"lag_{lag}"
+        value = autocorrelations[f"Lag {lag}"]
+        result[key] = None if pd.isna(value) else float(value)
+        if lag == 1:
+            result["lag_1_autocorrelation"] = result[key]
+    return result
 
 
-# Example IV.2.12: iTraxx Europe 5-Year Index (Table IV.2.37)
-daily_vol_bp = 2.4037
-autocorrelation = 0.1079
-trading_days_per_year = 250
+# --- Demonstration of Autocorrelation in Credit Spreads ---
 
-# 1. Base i.i.d. Volatility
-annual_vol_iid = scale_volatility(daily_vol_bp, trading_days_per_year, rho=0.0)
 
-# 2. Autocorrelation-Adjusted Volatility
-annual_vol_adj = scale_volatility(daily_vol_bp, trading_days_per_year, rho=autocorrelation)
-adjusted_h = calculate_adjusted_time_horizon(trading_days_per_year, autocorrelation)
+def _main():
+    # Setup Mock iTraxx Europe 5-year Index Data
+    # Highly autocorrelated data (simulated random walk with drift and mean reversion)
+    np.random.seed(42)
+    n_days = 1000
 
-print("--- iTraxx Europe 5-Year Index Volatility ---")
-print(f"Daily Volatility: {daily_vol_bp} basis points")
-print(f"Autocorrelation: {autocorrelation}\n")
+    # Generate a mock spread series that trends and has autocorrelated changes
+    mock_changes = np.random.normal(0, 2.0, n_days)
+    for i in range(1, n_days):
+        # Introduce strong AR(1) behavior to mimic credit spreads
+        mock_changes[i] += 0.65 * mock_changes[i - 1]
 
-print(f"I.I.D. Annual Volatility: {annual_vol_iid:.1f} basis points (h = 250)")
-print(
-    f"Autocorrelated Annual Volatility: {annual_vol_adj:.1f} basis points (h_tilde = {adjusted_h:.0f})"
-)
+    mock_spreads = pd.Series(np.cumsum(mock_changes) + 50)  # Base of 50 bps
+
+    # Execute Analysis
+    autocorr_results, changes = analyze_credit_spread_autocorrelation(mock_spreads)
+
+    print("--- Credit Spread Changes Autocorrelation (Mock Data) ---")
+    for lag, rho in autocorr_results.items():
+        print(f"{lag}: {rho:.4f}")
+
+    print("\nInterpretation:")
+    print("Credit spreads exhibit strong positive autocorrelation in their daily changes.")
+    print(
+        "Because credit markets trend significantly (unlike i.i.d equity markets), using the square-root-of-time rule for VaR severely underestimates the true risk over longer horizons."
+    )
+
+
+if __name__ == "__main__":
+    _main()

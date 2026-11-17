@@ -1,3 +1,10 @@
+"""Vector Autoregression (VAR) model fitting.
+
+Fits a VAR(p) to stationary multivariate returns with the lag order selected
+by the Akaike Information Criterion (AIC) up to a maximum lag.
+"""
+
+import numpy as np
 from statsmodels.tsa.api import VAR
 
 
@@ -21,6 +28,33 @@ def fit_var_model(stationary_returns, max_lags=5):
         "Intercepts (Alpha)": fitted_var.intercept,
         "Residual Covariance": fitted_var.sigma_u,
         "Model Summary": fitted_var.summary(),
+    }
+
+
+def compute(stationary_returns, max_lags: int = 5) -> dict:
+    """Standard facade: AIC-selected VAR fit as a JSON-serializable dict.
+
+    Parameters:
+    stationary_returns: 2-D array-like (T observations x k variables) or a
+    pandas DataFrame of stationary returns.
+    max_lags (int): Maximum lag order considered by the AIC selection (>= 0).
+
+    Returns:
+    dict: {"optimal_lags", "n_variables", "coefficient_matrices",
+    "intercepts", "residual_covariance"} with plain lists/floats/ints.
+    """
+    max_lags = int(max_lags)
+    if max_lags < 0:
+        raise ValueError("max_lags must be non-negative")
+
+    results = fit_var_model(stationary_returns, max_lags=max_lags)
+    coefs = np.asarray(results["Coefficient Matrices (Phi)"], dtype=float)
+    return {
+        "optimal_lags": int(results["Optimal Lags (p)"]),
+        "n_variables": int(coefs.shape[-1]) if coefs.ndim >= 2 else 0,
+        "coefficient_matrices": coefs.tolist(),
+        "intercepts": np.asarray(results["Intercepts (Alpha)"], dtype=float).tolist(),
+        "residual_covariance": np.asarray(results["Residual Covariance"], dtype=float).tolist(),
     }
 
 

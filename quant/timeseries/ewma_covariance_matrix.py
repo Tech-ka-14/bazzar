@@ -1,61 +1,62 @@
+"""EWMA covariance matrix forecasting.
+
+Recursively updates the multivariate covariance matrix with the outer
+product of the latest returns vector; the most recent state is the
+quadratically weighted EWMA covariance forecast.
+"""
+
 import numpy as np
 
-from .ewma_variance_volatility import calculate_ewma_variance
 
-
-def calculate_ewma_covariance(
-    returns_1: np.ndarray, returns_2: np.ndarray, lambda_param: float, initial_cov: float = None
-) -> np.ndarray:
+def calculate_ewma_covariance(returns_matrix, lam=0.94):
     """
-    Calculates the time series of EWMA covariance using the recursive formula (Equation IV.2.81).
+    Computes the EWMA Covariance matrix for a matrix of asset returns.
+
+    returns_matrix: A T x m numpy array of returns (T observations, m assets).
+    lam: The decay factor (e.g., 0.94 for daily data, 0.97 for monthly).
     """
-    n = len(returns_1)
-    ewma_cov = np.zeros(n)
+    # 1. Extract dimensions
+    T, m = returns_matrix.shape
 
-    ewma_cov[0] = initial_cov if initial_cov is not None else np.cov(returns_1, returns_2)[0, 1]
+    # 2. Initialize the covariance matrix using the sample covariance
+    current_covariance = np.cov(returns_matrix, rowvar=False)
 
-    for t in range(1, n):
-        ewma_cov[t] = (1 - lambda_param) * (returns_1[t - 1] * returns_2[t - 1]) + (
-            lambda_param * ewma_cov[t - 1]
-        )
+    # 3. Iterate through time to update the EWMA Covariance recursively
+    for t in range(T):
+        # Extract the return vector for time t (m x 1)
+        returns_vector = returns_matrix[t, :].reshape(m, 1)
 
-    return ewma_cov
+        # Calculate the outer product of the return vector: x * x'
+        outer_product = returns_vector @ returns_vector.T
+
+        # Update the covariance matrix
+        current_covariance = lam * current_covariance + (1 - lam) * outer_product
+
+    return current_covariance
 
 
-def build_ewma_covariance_matrix(returns_matrix: np.ndarray, lambda_param: float) -> np.ndarray:
+def compute(returns_matrix, lam=0.94) -> dict:
+    """Standard facade: EWMA covariance forecast as a JSON-serializable dict.
+
+    Parameters:
+    returns_matrix: 2-D array-like (T observations x m assets) of returns.
+    lam (float): EWMA decay factor in (0, 1), e.g. 0.94 for daily data.
+
+    Returns:
+    dict: {"n_observations", "n_assets", "lambda", "covariance"} with the
+    EWMA covariance matrix as a nested list of plain floats.
     """
-    Constructs the final EWMA covariance matrix for the most recent time step t.
-    returns_matrix shape should be (num_assets, num_timesteps)
-    """
-    num_assets, n_steps = returns_matrix.shape
-    ewma_matrix_t = np.zeros((num_assets, num_assets))
+    returns_matrix = np.asarray(returns_matrix, dtype=float)
+    if returns_matrix.ndim != 2 or min(returns_matrix.shape) < 2:
+        raise ValueError("returns_matrix must be a 2-D array with at least 2 rows and columns")
+    lam = float(lam)
+    if not 0.0 < lam < 1.0:
+        raise ValueError("lam must be in the open interval (0, 1)")
 
-    for i in range(num_assets):
-        for j in range(num_assets):
-            if i == j:
-                # Calculate variance
-                var_series = calculate_ewma_variance(returns_matrix[i], lambda_param)
-                ewma_matrix_t[i, j] = var_series[-1]
-            else:
-                # Calculate covariance
-                cov_series = calculate_ewma_covariance(
-                    returns_matrix[i], returns_matrix[j], lambda_param
-                )
-                ewma_matrix_t[i, j] = cov_series[-1]
-
-    return ewma_matrix_t
-
-
-# Mock data for S&P 500 and NDX (Table IV.2.32)
-np.random.seed(42)
-ret_sp500 = np.random.normal(0, 0.012, 500)
-ret_ndx = ret_sp500 * 1.2 + np.random.normal(0, 0.005, 500)  # Correlated returns
-
-asset_returns = np.array([ret_sp500, ret_ndx])
-
-# Build the dynamic RiskMetrics Daily Matrix
-daily_matrix_lambda = 0.94
-ewma_cov_matrix = build_ewma_covariance_matrix(asset_returns, daily_matrix_lambda)
-
-print("Current Daily EWMA Covariance Matrix (lambda=0.94):")
-print(ewma_cov_matrix)
+    covariance = calculate_ewma_covariance(returns_matrix, lam)
+    return {
+        "n_observations": int(returns_matrix.shape[0]),
+        "n_assets": int(returns_matrix.shape[1]),
+        "lambda": lam,
+        "covariance": covariance.tolist(),
+    }

@@ -1,64 +1,85 @@
+"""Geometric Brownian motion.
+
+S_t = S_0 exp((mu - sigma^2/2) t + sigma W_t); log returns are normal,
+making GBM the canonical continuous-time model for asset prices.
+"""
+
 import numpy as np
 
 
-def simulate_gbm_paths(S0, drift, volatility, T, steps, num_paths=1):
+def simulate_gbm(S0, mu, sigma, T, dt, n_simulations):
     """
-    Simulates asset price paths following Geometric Brownian Motion.
+    Simulates Geometric Brownian Motion for n_simulations paths.
+    Returns the final prices at time T.
+    """
+    # Number of steps
+    n_steps = int(T / dt)
+
+    # Generate all random shocks at once (vectorized for speed)
+    Z = np.random.standard_normal((n_simulations, n_steps))
+
+    # Calculate log returns
+    log_returns = (mu - 0.5 * sigma**2) * dt + sigma * np.sqrt(dt) * Z
+
+    # Sum log returns to get total log return over horizon
+    total_log_return = np.sum(log_returns, axis=1)
+
+    # Compute final prices
+    final_prices = S0 * np.exp(total_log_return)
+
+    return final_prices
+
+
+def compute(data, mu=None, sigma=None, T=1.0, dt=0.004, n_simulations=1000, seed=None) -> dict:
+    """Standard facade: GBM terminal-price simulation summary.
 
     Parameters:
-    S0 (float): Current asset price.
-    drift (float): The expected annualized return (or risk-free rate).
-    volatility (float): The annualized standard deviation of returns.
-    T (float): Total time horizon in years.
-    steps (int): Number of discrete time steps.
-    num_paths (int): Number of independent price paths to simulate.
+    data (float): initial price S0 (positive).
+    mu (float): drift of the price process.
+    sigma (float): volatility of the price process (positive).
+    T (float): horizon in years (positive).
+    dt (float): simulation time step (positive, <= T).
+    n_simulations (int): number of simulated paths.
+    seed (int, optional): RNG seed for reproducibility.
 
     Returns:
-    numpy.ndarray: An array of shape (steps + 1, num_paths) containing the simulated prices.
+    dict: {"s0", "mu", "sigma", "t", "n_simulations",
+    "mean_terminal_price", "std_terminal_price", "min_terminal_price",
+    "max_terminal_price"} of the simulated terminal prices.
     """
-    dt = T / steps
+    if mu is None or sigma is None:
+        raise ValueError("mu and sigma are required")
+    S0 = float(data)
+    mu = float(mu)
+    sigma = float(sigma)
+    T = float(T)
+    dt = float(dt)
+    if S0 <= 0.0:
+        raise ValueError("S0 must be positive")
+    if sigma <= 0.0:
+        raise ValueError("sigma must be positive")
+    if T <= 0.0 or dt <= 0.0 or dt > T:
+        raise ValueError("require 0 < dt <= T")
+    if int(n_simulations) < 2:
+        raise ValueError("n_simulations must be at least 2")
 
-    # Calculate the deterministic drift term
-    alpha = (drift - 0.5 * volatility**2) * dt
+    if seed is not None:
+        state = np.random.get_state()
+        np.random.seed(seed)
+    try:
+        final_prices = simulate_gbm(S0, mu, sigma, T, dt, int(n_simulations))
+    finally:
+        if seed is not None:
+            np.random.set_state(state)
 
-    # Calculate the standard deviation for the discrete time step
-    sigma_sq_dt = volatility * np.sqrt(dt)
-
-    # Generate random standard normal draws for all steps and paths
-    Z = np.random.standard_normal((steps, num_paths))
-
-    # Calculate the log returns for each step
-    log_returns = alpha + sigma_sq_dt * Z
-
-    # Initialize the array to hold the price paths
-    price_paths = np.zeros((steps + 1, num_paths))
-    price_paths[0] = S0
-
-    # Accumulate the log returns and exponentiate to get the exact price paths
-    price_paths[1:] = S0 * np.exp(np.cumsum(log_returns, axis=0))
-
-    return price_paths
-
-
-if __name__ == "__main__":
-    # Example replicating the text's scenario: 1 year, daily steps, 5% drift, 20% vol
-    current_price = 100.0
-    risk_free_rate = 0.05
-    annual_vol = 0.20
-    time_horizon = 1.0
-    trading_days = 365
-
-    np.random.seed(42)  # For reproducibility
-    simulated_paths = simulate_gbm_paths(
-        S0=current_price,
-        drift=risk_free_rate,
-        volatility=annual_vol,
-        T=time_horizon,
-        steps=trading_days,
-        num_paths=4,  # Simulating 4 independent paths
-    )
-
-    print("--- Geometric Brownian Motion Simulation ---")
-    print(f"Initial Price: {simulated_paths[0, 0]}")
-    print("Terminal Prices (Day 365) for 4 paths:")
-    print(np.round(simulated_paths[-1, :], 2))
+    return {
+        "s0": S0,
+        "mu": mu,
+        "sigma": sigma,
+        "t": T,
+        "n_simulations": int(n_simulations),
+        "mean_terminal_price": float(np.mean(final_prices)),
+        "std_terminal_price": float(np.std(final_prices)),
+        "min_terminal_price": float(np.min(final_prices)),
+        "max_terminal_price": float(np.max(final_prices)),
+    }

@@ -1,85 +1,98 @@
+"""Technical analysis toolkit.
+
+Implements John Murphy's trend, momentum, volatility-band, volume, gap,
+reversal-day, candlestick and retracement indicators as pandas column
+transforms over OHLCV data.
+"""
+
+from typing import Optional, Union
+
 import numpy as np
 import pandas as pd
 
 
 class TechnicalAnalyzer:
     """
-    A comprehensive engine for performing technical analysis on financial data,
-    incorporating concepts from Trend Analysis, Momentum Oscillators, Volume
-    Analysis, and Japanese Candlesticks.
+    A comprehensive Technical Analysis toolkit implementing John Murphy's
+    'Technical Analysis of the Financial Markets'.
+    Designed to be robust against real-world imperfect data (NaNs, zeros).
     """
 
-    def __init__(self, data: pd.DataFrame):
+    def __init__(self, data_source: Union[str, pd.DataFrame]):
         """
-        Initializes the analyzer with a pandas DataFrame.
-        Expected columns: 'Open', 'High', 'Low', 'Close', 'Volume'
+        Initialize with a CSV file path or a pandas DataFrame.
+        Expects columns: 'Open', 'High', 'Low', 'Close', 'Volume'
         """
-        self.data = data.copy()
-        # Ensure column names are standard
-        self.data.rename(columns=lambda x: x.capitalize(), inplace=True)
-        required_cols = ["Open", "High", "Low", "Close", "Volume"]
-        for col in required_cols:
-            if col not in self.data.columns:
-                raise ValueError(f"Missing required column: {col}")
+        if isinstance(data_source, str):
+            self.data = pd.read_csv(data_source)
+        else:
+            self.data = data_source.copy()
+
+        # Standardize column names to handle lowercase/uppercase input gracefully
+        self.data.columns = [col.capitalize() for col in self.data.columns]
 
     # =========================================================================
-    # 1. TREND INDICATORS (Moving Averages)
+    # 1. TREND INDICATORS
     # =========================================================================
-    def add_sma(self, period: int, column: str = "Close"):
-        """Simple Moving Average (SMA)"""
+    def add_sma(self, period: int = 50, column: str = "Close"):
+        """Simple Moving Average"""
         self.data[f"SMA_{period}"] = self.data[column].rolling(window=period).mean()
         return self.data
 
-    def add_ema(self, period: int, column: str = "Close"):
-        """Exponential Moving Average (EMA)"""
+    def add_ema(self, period: int = 20, column: str = "Close"):
+        """Exponential Moving Average"""
         self.data[f"EMA_{period}"] = self.data[column].ewm(span=period, adjust=False).mean()
         return self.data
 
-    def add_wma(self, period: int, column: str = "Close"):
-        """Linearly Weighted Moving Average (WMA)"""
-        weights = np.arange(1, period + 1)
-        self.data[f"WMA_{period}"] = (
-            self.data[column]
-            .rolling(window=period)
-            .apply(lambda prices: np.dot(prices, weights) / weights.sum(), raw=True)
-        )
-        return self.data
-
     # =========================================================================
-    # 2. OSCILLATORS & MOMENTUM
+    # 2. MOMENTUM OSCILLATORS
     # =========================================================================
     def add_rsi(self, period: int = 14, column: str = "Close"):
-        """Relative Strength Index (RSI)"""
-        delta = self.data[column].diff(1)
-        gain = delta.where(delta > 0, 0.0)
-        loss = -delta.where(delta < 0, 0.0)
+        """Relative Strength Index (Wilder's Smoothing)"""
+        delta = self.data[column].diff()
 
-        avg_gain = gain.rolling(window=period).mean()
-        avg_loss = loss.rolling(window=period).mean()
+        # Separate gains and losses
+        gain = (delta.where(delta > 0, 0)).fillna(0)
+        loss = (-delta.where(delta < 0, 0)).fillna(0)
 
-        rs = avg_gain / avg_loss
+        # Calculate Wilder's Smoothing (alpha = 1/period)
+        avg_gain = gain.ewm(alpha=1 / period, min_periods=period, adjust=False).mean()
+        avg_loss = loss.ewm(alpha=1 / period, min_periods=period, adjust=False).mean()
+
+        rs = avg_gain / avg_loss.replace(0, np.nan)
         self.data[f"RSI_{period}"] = 100 - (100 / (1 + rs))
+
+        # Handle edge case where avg_loss is 0 (RSI = 100)
+        self.data.loc[avg_loss == 0, f"RSI_{period}"] = 100
         return self.data
 
-    def add_macd(self, fast: int = 12, slow: int = 26, signal: int = 9, column: str = "Close"):
-        """Moving Average Convergence Divergence (MACD)"""
-        fast_ema = self.data[column].ewm(span=fast, adjust=False).mean()
-        slow_ema = self.data[column].ewm(span=slow, adjust=False).mean()
+    def add_macd(
+        self,
+        fast_period: int = 12,
+        slow_period: int = 26,
+        signal_period: int = 9,
+        column: str = "Close",
+    ):
+        """Moving Average Convergence Divergence"""
+        ema_fast = self.data[column].ewm(span=fast_period, adjust=False).mean()
+        ema_slow = self.data[column].ewm(span=slow_period, adjust=False).mean()
 
-        self.data["MACD_Line"] = fast_ema - slow_ema
-        self.data["MACD_Signal"] = self.data["MACD_Line"].ewm(span=signal, adjust=False).mean()
-        self.data["MACD_Histogram"] = self.data["MACD_Line"] - self.data["MACD_Signal"]
+        self.data["MACD_Line"] = ema_fast - ema_slow
+        self.data["MACD_Signal"] = self.data["MACD_Line"].ewm(
+            span=signal_period, adjust=False
+        ).mean()
+        self.data["MACD_Hist"] = self.data["MACD_Line"] - self.data["MACD_Signal"]
         return self.data
 
-    def add_stochastic(self, period: int = 14, smooth_k: int = 3, smooth_d: int = 3):
+    def add_stochastic(self, k_period: int = 14, d_period: int = 3):
         """Stochastic Oscillator (%K and %D)"""
-        low_min = self.data["Low"].rolling(window=period).min()
-        high_max = self.data["High"].rolling(window=period).max()
+        low_min = self.data["Low"].rolling(window=k_period).min()
+        high_max = self.data["High"].rolling(window=k_period).max()
 
-        self.data["Stoch_%K_raw"] = 100 * ((self.data["Close"] - low_min) / (high_max - low_min))
-        self.data["Stoch_%K"] = self.data["Stoch_%K_raw"].rolling(window=smooth_k).mean()
-        self.data["Stoch_%D"] = self.data["Stoch_%K"].rolling(window=smooth_d).mean()
-        self.data.drop(columns=["Stoch_%K_raw"], inplace=True)
+        self.data["Stoch_%K"] = 100 * (
+            (self.data["Close"] - low_min) / (high_max - low_min).replace(0, np.nan)
+        )
+        self.data["Stoch_%D"] = self.data["Stoch_%K"].rolling(window=d_period).mean()
         return self.data
 
     def add_williams_r(self, period: int = 14):
@@ -238,3 +251,67 @@ class TechnicalAnalyzer:
         self.detect_candlesticks()
 
         return self.data
+
+
+def compute(data) -> dict:
+    """Standard facade: latest technical indicator readings as a JSON dict.
+
+    Parameters:
+    data: pandas DataFrame (or dict of equal-length column lists) with
+    Open/High/Low/Close/Volume columns (case-insensitive). At least 200 rows
+    are needed for every indicator (SMA_200) to be defined.
+
+    Returns:
+    dict: {"n_rows", "indicators"} where indicators maps each computed
+    indicator column to its latest value; values that are still undefined
+    (insufficient history) are None.
+    """
+    if not isinstance(data, pd.DataFrame):
+        data = pd.DataFrame(data)
+    if len(data) < 2:
+        raise ValueError("data must contain at least two rows")
+
+    analyzer = TechnicalAnalyzer(data)
+    enriched = analyzer.run_all_analysis()
+
+    base_cols = {c.capitalize() for c in ("Open", "High", "Low", "Close", "Volume")}
+    indicator_cols = [c for c in enriched.columns if c not in base_cols]
+
+    def _json_value(value):
+        if pd.isna(value):
+            return None
+        if isinstance(value, (bool, np.bool_)):
+            return bool(value)
+        return float(value)
+
+    latest = enriched.iloc[-1]
+    return {
+        "n_rows": int(len(enriched)),
+        "indicators": {col: _json_value(latest[col]) for col in indicator_cols},
+    }
+
+
+if __name__ == "__main__":
+    # Sample Mock Data matching typical Yahoo Finance format
+    mock_data = pd.DataFrame(
+        {
+            "Open": np.random.normal(100, 2, 250),
+            "High": np.random.normal(102, 2, 250),
+            "Low": np.random.normal(98, 2, 250),
+            "Close": np.random.normal(101, 2, 250),
+            "Volume": np.random.randint(1000000, 5000000, 250),
+        }
+    )
+
+    # Ensure High is always the max and Low is the min for realism
+    mock_data["High"] = mock_data[["Open", "High", "Close"]].max(axis=1) + 1
+    mock_data["Low"] = mock_data[["Open", "Low", "Close"]].min(axis=1) - 1
+
+    # Run Analysis
+    analyzer = TechnicalAnalyzer(mock_data)
+    final_df = analyzer.run_all_analysis()
+
+    print("Columns in final DataFrame:")
+    print(final_df.columns.tolist())
+    print("\nLast 5 rows:")
+    print(final_df.tail())
