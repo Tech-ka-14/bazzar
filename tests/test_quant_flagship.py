@@ -158,7 +158,11 @@ class TestGarch:
         ll = 0.0
         for t in range(1, 3):
             s2.append(omega + alpha * returns[t - 1] ** 2 + beta * s2[-1])
-            ll += -0.5 * math.log(2 * math.pi) - 0.5 * math.log(s2[-1]) - 0.5 * returns[t] ** 2 / s2[-1]
+            ll += (
+                -0.5 * math.log(2 * math.pi)
+                - 0.5 * math.log(s2[-1])
+                - 0.5 * returns[t] ** 2 / s2[-1]
+            )
         got = student_t_garch.normal_garch_loglik([omega, alpha, beta], returns)
         assert got == pytest.approx(-ll, rel=1e-10)
 
