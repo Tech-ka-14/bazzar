@@ -5,7 +5,7 @@ reversal-day, candlestick and retracement indicators as pandas column
 transforms over OHLCV data.
 """
 
-from typing import Optional, Union
+from typing import Union
 
 import numpy as np
 import pandas as pd
