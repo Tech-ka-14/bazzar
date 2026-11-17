@@ -153,3 +153,78 @@ class HealthDataResponse(BaseModel):
 class IngestionMetaResponse(BaseModel):
     freshness: Any
     recent_runs: Any
+
+
+# --- P7-C analytics (roadmap 7.3) --------------------------------------------
+
+
+class VarResponse(BaseModel):
+    """Single-symbol VaR/ES; var_value is null (no position size tracked)."""
+
+    symbol: str
+    method: str
+    confidence: float
+    var_pct: float
+    var_value: float | None = None
+    es_pct: float | None = None
+    n_obs: int
+    asOf: str
+    source: str
+    cached: bool
+
+
+class VolatilityResponse(BaseModel):
+    symbol: str
+    model: str
+    current_vol: float
+    annualized_vol: float | None = None
+    params: dict[str, Any]
+    n_obs: int
+    asOf: str
+    source: str
+    cached: bool
+
+
+class PortfolioRiskRequest(BaseModel):
+    weights: dict[str, float]
+    confidence: float = 0.99
+
+
+class PortfolioRiskResponse(BaseModel):
+    symbols: list[str]
+    weights: dict[str, float]
+    confidence: float
+    var_pct: float
+    es_pct: float | None = None
+    portfolio_volatility: float
+    undiversified_var: float | None = None
+    component_var: dict[str, float]
+    sharpe: float | None = None
+    sortino: float | None = None
+    n_obs: int
+    asOf: str
+    source: str
+    cached: bool
+
+
+class CoverageTestResult(BaseModel):
+    lr: float
+    p_value: float
+    decision: str
+
+
+class VarBacktestResponse(BaseModel):
+    symbol: str
+    method: str
+    confidence: float
+    window: int
+    n_obs: int
+    exceptions: int
+    exception_rate: float
+    expected_exceptions: float
+    kupiec: CoverageTestResult
+    christoffersen: CoverageTestResult | None = None
+    basel_zone: str
+    asOf: str
+    source: str
+    cached: bool

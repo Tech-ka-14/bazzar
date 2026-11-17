@@ -36,6 +36,14 @@ warn_unused_ignores = true
 warn_redundant_casts = true
 # Ratchet towards strict: backend/ first, quant/ after P7 standardization.
 
+[[tool.mypy.overrides]]
+# P7-C: backend/analytics.py calls the quant.api dispatch layer; keep quant/
+# itself out of the typed set (per the ratchet plan above) until it is
+# standardized, instead of dragging its legacy modules into the backend gate.
+module = "quant.*"
+follow_imports = "skip"
+ignore_errors = true
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
