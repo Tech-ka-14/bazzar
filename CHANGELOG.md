@@ -45,6 +45,36 @@ versioning: [SemVer](https://semver.org/).
     `tests/test_analytics_api.py` (exact response shapes, envelope paths,
     cache-hit behaviour).
 
+### Added (P7-D — risk analytics UI + release, roadmap 7.4)
+- **Analytics API wrappers (7.4):** `src/api.js` gains `apiPost` (same
+  bearer auth as `apiGet`) plus thin wrappers `getVar`, `getVolatility`,
+  `getPortfolioRisk` and `getVarBacktest` over `/api/v1/analytics/*`.
+  Non-2xx responses now throw `ApiError` carrying the HTTP status and the
+  parsed `{error: {code, message}}` envelope, so the UI can render explicit
+  states instead of generic failures.
+- **Equity stock deep dive:** selecting a watchlist row (click) or any
+  symbol via search opens a deep-dive card with the backend PNG chart and
+  the new `src/components/RiskPanel.jsx` — VaR/ES (method selector
+  historical/parametric/montecarlo, confidence 95%/99%), EWMA/GARCH
+  volatility (current + annualized), and the VaR backtest summary
+  (exceptions vs expected, Kupiec decision, green/amber/red Basel zone
+  badge). Every block shows `as of {asOf}` + `n_obs` from its own payload;
+  422 renders "Not enough history ({n_obs} obs, need {minimum})" and 404
+  "Symbol not synced" — no fabricated numbers anywhere.
+- **Home portfolio risk card:** `src/components/PortfolioRiskCard.jsx` —
+  symbol + weight-percent inputs with a live sum-to-100 check, POSTs to
+  `/api/v1/analytics/portfolio/risk`, and shows VaR/ES, portfolio
+  volatility, undiversified VaR, annualized Sharpe/Sortino and the
+  per-symbol Euler component-VaR split as theme-consistent bars, with the
+  `asOf` stamp and the same explicit empty/error states.
+- **Frontend tests:** new vitest coverage for the analytics wrappers
+  (URL/method/body/auth, `ApiError` envelope propagation) and jsdom render
+  tests for both new cards (empty states + data states, mocked fetch);
+  `jsdom` added as a devDependency. 32 vitest tests total (was 20).
+
+### Changed
+- Version bumped to **1.9.0** (`package.json`, `pyproject.toml`).
+
 ## [1.8.0] - 2026-10-12
 
 ### Added (P6 — security pass, roadmap 6.1–6.5)
