@@ -1,3 +1,11 @@
+"""Single-factor risk decomposition into systematic and specific risk.
+
+For an asset with beta to a market factor, systematic risk is
+beta * sigma_market and specific risk is sigma_epsilon; variances are
+additive, so total variance = beta^2 * V(X) + V(epsilon) (Equations
+II.1.15-II.1.16, Alexander 2008).
+"""
+
 import numpy as np
 
 
@@ -38,6 +46,19 @@ def calculate_risk_components(beta, market_volatility, specific_volatility):
         "total_variance": total_variance,
         "total_risk": total_risk,
     }
+
+
+def compute(beta: float, market_volatility: float, specific_volatility: float) -> dict:
+    """Standard facade: single-factor risk decomposition as a JSON dict.
+
+    Returns:
+    dict: {"systematic_risk", "specific_risk", "systematic_variance",
+    "specific_variance", "total_variance", "total_risk"} with plain floats.
+    """
+    components = calculate_risk_components(
+        float(beta), float(market_volatility), float(specific_volatility)
+    )
+    return {key: float(value) for key, value in components.items()}
 
 
 if __name__ == "__main__":

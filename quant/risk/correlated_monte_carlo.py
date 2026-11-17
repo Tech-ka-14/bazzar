@@ -1,3 +1,10 @@
+"""Correlated Monte Carlo simulation of joint asset returns.
+
+Draws correlated Normal or Student-t vectors via the Cholesky decomposition
+of a covariance matrix (Example I.5.10, Alexander 2008). Uses the legacy
+global ``numpy.random`` RNG; callers seed it explicitly for reproducibility.
+"""
+
 import numpy as np
 
 
@@ -50,6 +57,39 @@ def simulate_correlated_student_t(means, cov_matrix, degrees_of_freedom, num_sim
     correlated_simulations = (C @ Z).T + means
 
     return correlated_simulations
+
+
+def compute(means, cov_matrix, num_simulations: int = 1000, seed: int = None) -> dict:
+    """Standard facade: seeded correlated-normal simulation as a JSON dict.
+
+    Parameters:
+    means: 1-D array-like of expected returns per asset.
+    cov_matrix: 2-D positive-definite covariance matrix (array-like).
+    num_simulations (int): Number of joint scenarios to generate.
+    seed (int, optional): Seed for the legacy global ``numpy.random`` RNG
+    (the simulation functions use it); ``None`` leaves the RNG unseeded.
+
+    Returns:
+    dict: {"model", "num_simulations", "num_assets", "seed",
+    "simulated_returns"} with the simulated matrix as nested lists.
+    """
+    means = np.asarray(means, dtype=float).ravel()
+    cov_matrix = np.asarray(cov_matrix, dtype=float)
+    if cov_matrix.shape != (means.size, means.size):
+        raise ValueError("cov_matrix must be square with side len(means)")
+    if int(num_simulations) < 1:
+        raise ValueError("num_simulations must be a positive integer")
+
+    if seed is not None:
+        np.random.seed(int(seed))
+    simulated = simulate_correlated_normals(means, cov_matrix, int(num_simulations))
+    return {
+        "model": "montecarlo",
+        "num_simulations": int(num_simulations),
+        "num_assets": int(means.size),
+        "seed": None if seed is None else int(seed),
+        "simulated_returns": simulated.tolist(),
+    }
 
 
 if __name__ == "__main__":

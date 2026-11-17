@@ -1,3 +1,12 @@
+"""Conditional VaR metrics: normal benchmark VaR and historical ETL (ES).
+
+The historical Expected Tail Loss (ETL, a.k.a. expected shortfall) is the
+average loss beyond the empirical VaR threshold, where the threshold is the
+"lower" empirical alpha-quantile (``numpy.quantile(..., method="lower")``)
+and the tail set is all returns <= that threshold.
+Reference: Alexander (2008), Market Risk Analysis IV, Examples IV.1.9-IV.1.10.
+"""
+
 import numpy as np
 from scipy.stats import norm
 
@@ -37,34 +46,68 @@ def calculate_historical_etl(returns: np.ndarray, confidence_level: float, portf
     return var_value, etl_value
 
 
-# 1. Example IV.1.9: Normal Benchmark VaR
-exp_active_ret = 0.0
-track_err = 0.03
-conf = 0.99
-port_val = 10_000_000
+def compute(returns, confidence: float = 0.99, portfolio_value: float = 1.0) -> dict:
+    """Standard facade: historical VaR + expected shortfall as a JSON dict.
 
-b_var = calculate_normal_benchmark_var(exp_active_ret, track_err, conf, port_val)
-print(f"1% 1-Year Benchmark VaR (Normal): ${b_var:,.0f}")
+    Parameters:
+    returns: 1-D array-like of historical returns (fractions).
+    confidence (float): Confidence level in (0, 1), e.g. 0.99.
+    portfolio_value (float): Nominal portfolio value for monetary metrics.
 
-# 2. Example IV.1.10: Historical ETL
-# Mock dataset reflecting the 10 largest losses from Table IV.1.4 mixed with normal returns
-mock_returns = np.random.normal(0.001, 0.01, 990)
-tail_returns = np.array(
-    [
-        -0.06127,
-        -0.06033,
-        -0.05690,
-        -0.05233,
-        -0.04241,
-        -0.03891,
-        -0.03864,
-        -0.03801,
-        -0.03727,
-        -0.03549,
-    ]
-)
-full_returns = np.concatenate([mock_returns, tail_returns])
+    Returns:
+    dict: {"method", "confidence", "n", "var", "es", "var_value",
+    "es_value"} with positive loss fractions and monetary values. "es" uses
+    the module's ETL convention ("lower" quantile threshold, tail inclusive).
+    """
+    returns = np.asarray(returns, dtype=float).ravel()
+    if returns.size == 0:
+        raise ValueError("returns must contain at least one observation")
+    if not 0.0 < confidence < 1.0:
+        raise ValueError("confidence must be in the open interval (0, 1)")
 
-hist_var, hist_etl = calculate_historical_etl(full_returns, 0.99, 1_007_580)
-print(f"1% 1-Day Historical VaR: ${hist_var:,.0f}")
-print(f"1% 1-Day Expected Tail Loss (ETL): ${hist_etl:,.0f}")
+    var_value, etl_value = calculate_historical_etl(
+        returns, float(confidence), float(portfolio_value)
+    )
+    return {
+        "method": "historical",
+        "confidence": float(confidence),
+        "n": int(returns.size),
+        "var": float(var_value / portfolio_value),
+        "es": float(etl_value / portfolio_value),
+        "var_value": float(var_value),
+        "es_value": float(etl_value),
+    }
+
+
+if __name__ == "__main__":
+    # 1. Example IV.1.9: Normal Benchmark VaR
+    exp_active_ret = 0.0
+    track_err = 0.03
+    conf = 0.99
+    port_val = 10_000_000
+
+    b_var = calculate_normal_benchmark_var(exp_active_ret, track_err, conf, port_val)
+    print(f"1% 1-Year Benchmark VaR (Normal): ${b_var:,.0f}")
+
+    # 2. Example IV.1.10: Historical ETL
+    # Mock dataset reflecting the 10 largest losses from Table IV.1.4 mixed with normal returns
+    mock_returns = np.random.normal(0.001, 0.01, 990)
+    tail_returns = np.array(
+        [
+            -0.06127,
+            -0.06033,
+            -0.05690,
+            -0.05233,
+            -0.04241,
+            -0.03891,
+            -0.03864,
+            -0.03801,
+            -0.03727,
+            -0.03549,
+        ]
+    )
+    full_returns = np.concatenate([mock_returns, tail_returns])
+
+    hist_var, hist_etl = calculate_historical_etl(full_returns, 0.99, 1_007_580)
+    print(f"1% 1-Day Historical VaR: ${hist_var:,.0f}")
+    print(f"1% 1-Day Expected Tail Loss (ETL): ${hist_etl:,.0f}")

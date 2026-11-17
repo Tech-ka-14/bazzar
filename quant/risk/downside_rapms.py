@@ -1,3 +1,11 @@
+"""Downside risk-adjusted performance measures (Sortino, Kappa, Omega).
+
+Based on lower partial moments LPM_alpha(tau) = E[max(0, tau - R)^alpha].
+The Sortino ratio is the Kappa index of order 2 with the risk-free rate as
+threshold; the Omega statistic is Kappa_1 + 1 (Alexander 2008, Section
+I.6.5).
+"""
+
 import numpy as np
 
 
@@ -39,6 +47,36 @@ def sortino_ratio(returns, risk_free_rate):
     Calculates the Sortino Ratio (Kappa index of order 2 with threshold = R_f).
     """
     return kappa_index(returns, risk_free_rate, alpha=2.0)
+
+
+def compute(returns, risk_free_rate: float = 0.0, threshold: float = 0.0) -> dict:
+    """Standard facade: Sortino ratio and LPM diagnostics as a JSON dict.
+
+    Parameters:
+    returns: 1-D array-like of periodic returns (fractions).
+    risk_free_rate (float): Per-period risk-free rate used as the Sortino
+    threshold.
+    threshold (float): Benchmark threshold for the Kappa/Omega diagnostics.
+
+    Returns:
+    dict: {"n", "risk_free_rate", "threshold", "sortino", "kappa1",
+    "kappa2", "kappa3", "omega", "lpm2"} with plain floats.
+    """
+    returns = np.asarray(returns, dtype=float).ravel()
+    if returns.size == 0:
+        raise ValueError("returns must contain at least one observation")
+
+    return {
+        "n": int(returns.size),
+        "risk_free_rate": float(risk_free_rate),
+        "threshold": float(threshold),
+        "sortino": float(sortino_ratio(returns, float(risk_free_rate))),
+        "kappa1": float(kappa_index(returns, float(threshold), alpha=1.0)),
+        "kappa2": float(kappa_index(returns, float(threshold), alpha=2.0)),
+        "kappa3": float(kappa_index(returns, float(threshold), alpha=3.0)),
+        "omega": float(omega_statistic(returns, float(threshold))),
+        "lpm2": float(lower_partial_moment(returns, float(risk_free_rate), alpha=2.0)),
+    }
 
 
 if __name__ == "__main__":
