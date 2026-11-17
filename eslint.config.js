@@ -39,9 +39,10 @@ export default [
     },
   },
   {
+    // Test files: node runner + jsdom browser globals (component render tests).
     files: ['src/__tests__/**/*.{js,jsx}', 'electron/__tests__/**/*.js'],
     languageOptions: {
-      globals: { ...globals.node },
+      globals: { ...globals.node, ...globals.browser },
     },
   },
 ];

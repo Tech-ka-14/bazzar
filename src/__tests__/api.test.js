@@ -78,3 +78,107 @@ describe('api.js bearer token (P5)', () => {
     await expect(fetchChart(`${API_BASE}/api/v1/indices/X/chart.png`)).rejects.toThrow('404');
   });
 });
+
+describe('api.js analytics wrappers (P7-D)', () => {
+  beforeEach(() => {
+    vi.resetModules();
+    vi.unstubAllGlobals();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  function mockJsonResponse(body, { ok = true, status = 200, statusText = 'OK' } = {}) {
+    return vi.fn().mockResolvedValue({
+      ok,
+      status,
+      statusText,
+      json: async () => body,
+    });
+  }
+
+  it('getVar hits the analytics endpoint with method and confidence params', async () => {
+    const fetchMock = mockJsonResponse({ symbol: 'INFY' });
+    vi.stubGlobal('fetch', fetchMock);
+    const { getVar } = await import('../api.js');
+    await getVar('INFY', 'parametric', 0.95);
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      `${API_BASE}/api/v1/analytics/var?symbol=INFY&method=parametric&confidence=0.95`
+    );
+  });
+
+  it('getVolatility defaults to the ewma model', async () => {
+    const fetchMock = mockJsonResponse({ symbol: 'INFY' });
+    vi.stubGlobal('fetch', fetchMock);
+    const { getVolatility } = await import('../api.js');
+    await getVolatility('INFY');
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      `${API_BASE}/api/v1/analytics/volatility?symbol=INFY&model=ewma`
+    );
+  });
+
+  it('getVarBacktest passes the confidence level', async () => {
+    const fetchMock = mockJsonResponse({ symbol: 'INFY' });
+    vi.stubGlobal('fetch', fetchMock);
+    const { getVarBacktest } = await import('../api.js');
+    await getVarBacktest('INFY', 0.99);
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      `${API_BASE}/api/v1/analytics/backtest/var?symbol=INFY&confidence=0.99`
+    );
+  });
+
+  it('getPortfolioRisk POSTs JSON weights with auth headers', async () => {
+    vi.stubGlobal('window', { bazzar: { getApiToken: async () => 'tok123' } });
+    const fetchMock = mockJsonResponse({ var_pct: 0.02 });
+    vi.stubGlobal('fetch', fetchMock);
+    const { getPortfolioRisk } = await import('../api.js');
+    await getPortfolioRisk({ INFY: 0.6, TCS: 0.4 }, 0.95);
+    const [url, options] = fetchMock.mock.calls[0];
+    expect(url).toBe(`${API_BASE}/api/v1/analytics/portfolio/risk`);
+    expect(options.method).toBe('POST');
+    expect(options.headers['Content-Type']).toBe('application/json');
+    expect(options.headers.Authorization).toBe('Bearer tok123');
+    expect(JSON.parse(options.body)).toEqual({
+      weights: { INFY: 0.6, TCS: 0.4 },
+      confidence: 0.95,
+    });
+  });
+
+  it('non-2xx responses throw ApiError carrying status and the error envelope', async () => {
+    const envelope = {
+      error: {
+        code: 'insufficient_data',
+        message:
+          'insufficient data for VaR: 42 return observations available, at least 250 required',
+      },
+    };
+    const fetchMock = mockJsonResponse(envelope, {
+      ok: false,
+      status: 422,
+      statusText: 'Unprocessable Entity',
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const { ApiError, getVar } = await import('../api.js');
+    const err = await getVar('INFY').catch((e) => e);
+    expect(err).toBeInstanceOf(ApiError);
+    expect(err.status).toBe(422);
+    expect(err.code).toBe('insufficient_data');
+    expect(err.detail).toContain('42 return observations');
+  });
+
+  it('404 responses surface as ApiError with status 404', async () => {
+    const envelope = { error: { code: 'not_found', message: 'unknown symbol: FOO' } };
+    const fetchMock = mockJsonResponse(envelope, {
+      ok: false,
+      status: 404,
+      statusText: 'Not Found',
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const { ApiError, getVolatility } = await import('../api.js');
+    const err = await getVolatility('FOO').catch((e) => e);
+    expect(err).toBeInstanceOf(ApiError);
+    expect(err.status).toBe(404);
+  });
+});

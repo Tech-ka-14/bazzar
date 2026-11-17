@@ -1,7 +1,7 @@
 {
   "name": "bazzar-terminal",
   "productName": "Bazzar Terminal",
-  "version": "1.8.0",
+  "version": "1.9.0",
   "description": "Bazzar Terminal - Windows desktop financial terminal built from the Bazzar repository",
   "author": "Bazzar",
   "license": "MIT",
@@ -34,18 +34,19 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@eslint/js": "^9.13.0",
     "@vitejs/plugin-react": "^4.3.3",
     "autoprefixer": "^10.4.20",
     "electron": "^33.2.0",
     "electron-builder": "^25.1.8",
-    "postcss": "^8.4.49",
-    "tailwindcss": "^3.4.15",
-    "vite": "^5.4.11",
-    "@eslint/js": "^9.13.0",
     "eslint": "^9.13.0",
     "eslint-plugin-react": "^7.37.2",
     "globals": "^15.11.0",
+    "jsdom": "^29.1.1",
+    "postcss": "^8.4.49",
     "prettier": "^3.3.3",
+    "tailwindcss": "^3.4.15",
+    "vite": "^5.4.11",
     "vitest": "^2.1.4"
   },
   "build": {
