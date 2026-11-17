@@ -1,3 +1,10 @@
+"""Copula goodness-of-fit via RMSE.
+
+Root Mean Square Error between an empirical copula surface and a fitted
+parametric copula surface evaluated on the same grid; the copula with the
+smaller RMSE is the better fit.
+"""
+
 import numpy as np
 
 
@@ -24,6 +31,29 @@ def calculate_copula_rmse(empirical_copula_matrix, fitted_copula_matrix):
     rmse = np.sqrt(mean_squared_error)
 
     return rmse
+
+
+def compute(empirical_copula_matrix, fitted_copula_matrix) -> dict:
+    """Standard facade: copula goodness-of-fit RMSE as a JSON dict.
+
+    Parameters:
+    empirical_copula_matrix: 2-D array-like of empirical copula values.
+    fitted_copula_matrix: 2-D array-like of fitted copula values with the
+    same shape.
+
+    Returns:
+    dict: {"grid_shape", "rmse"} with plain floats/ints.
+    """
+    empirical_copula_matrix = np.asarray(empirical_copula_matrix, dtype=float)
+    fitted_copula_matrix = np.asarray(fitted_copula_matrix, dtype=float)
+    if empirical_copula_matrix.size == 0:
+        raise ValueError("matrices must be non-empty")
+
+    rmse = calculate_copula_rmse(empirical_copula_matrix, fitted_copula_matrix)
+    return {
+        "grid_shape": [int(d) for d in empirical_copula_matrix.shape],
+        "rmse": float(rmse),
+    }
 
 
 # Example Usage:

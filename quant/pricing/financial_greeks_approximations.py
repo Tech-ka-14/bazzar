@@ -1,3 +1,11 @@
+"""Delta-gamma(-vega) PnL approximations.
+
+Second-order Taylor approximation of an option price change:
+dP ~ delta dS + 0.5 gamma (dS)^2, extended with the first-order volatility
+term + vega d(sigma) when the volatility shift is given.
+"""
+
+
 def delta_gamma_approximation(delta, gamma, delta_S):
     """
     Approximates the change in an option's price (PnL) using the first and
@@ -31,6 +39,49 @@ def delta_gamma_vega_approximation(delta, gamma, vega, delta_S, delta_vol):
     # Assuming cross-derivatives (e.g., vanna) are ignored as per the text
     approx_pnl = price_effect + volatility_effect
     return approx_pnl
+
+
+def compute(
+    delta: float, gamma: float, delta_S: float, vega: float = None, delta_vol: float = None
+) -> dict:
+    """Standard facade: Greeks-based PnL approximation as a JSON dict.
+
+    Parameters:
+    delta (float): Option delta (first derivative w.r.t. underlying price).
+    gamma (float): Option gamma (second derivative w.r.t. underlying price).
+    delta_S (float): Change in the underlying price.
+    vega (float, optional): Option vega; required together with delta_vol
+    for the multivariate approximation.
+    delta_vol (float, optional): Absolute change in implied volatility.
+
+    Returns:
+    dict: {"delta", "gamma", "delta_S", "approx_pnl", "vega_pnl",
+    "total_pnl"}; the vega entries are None unless both vega and delta_vol
+    are supplied.
+    """
+    delta = float(delta)
+    gamma = float(gamma)
+    delta_S = float(delta_S)
+
+    pnl = delta_gamma_approximation(delta, gamma, delta_S)
+    vega_pnl = None
+    total_pnl = None
+    if vega is not None or delta_vol is not None:
+        if vega is None or delta_vol is None:
+            raise ValueError("vega and delta_vol must be supplied together")
+        total_pnl = float(
+            delta_gamma_vega_approximation(delta, gamma, float(vega), delta_S, float(delta_vol))
+        )
+        vega_pnl = float(total_pnl - pnl)
+
+    return {
+        "delta": delta,
+        "gamma": gamma,
+        "delta_S": delta_S,
+        "approx_pnl": float(pnl),
+        "vega_pnl": vega_pnl,
+        "total_pnl": total_pnl,
+    }
 
 
 # --- Testing the financial concepts ---

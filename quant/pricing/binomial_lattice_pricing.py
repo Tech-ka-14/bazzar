@@ -1,3 +1,11 @@
+"""Binomial lattice (Cox-Ross-Rubinstein) option pricing.
+
+CRR parameters u = exp(sigma sqrt(dt)), d = 1/u,
+p = (exp(r dt) - d) / (u - d); European and American puts are priced by
+backward induction over the lattice, with early-exercise checks for the
+American case (Example I.5.9, Alexander 2008).
+"""
+
 import numpy as np
 
 
@@ -40,6 +48,56 @@ def binomial_put_pricing(S0, K, T, r, sigma, steps, is_american=False):
             option_values = expected_values
 
     return option_values[0]
+
+
+def compute(
+    S0: float,
+    K: float,
+    T: float,
+    r: float,
+    sigma: float,
+    steps: int = 100,
+    is_american: bool = False,
+) -> dict:
+    """Standard facade: binomial put price as a JSON-serializable dict.
+
+    Parameters:
+    S0 (float): Current underlying price, positive.
+    K (float): Strike price, positive.
+    T (float): Time to maturity in years, positive.
+    r (float): Continuously compounded risk-free rate.
+    sigma (float): Volatility, positive.
+    steps (int): Number of lattice steps (>= 1).
+    is_american (bool): True for early-exercise (American) pricing.
+
+    Returns:
+    dict: {"price", "is_american", "steps", "u", "d", "p"} with the CRR
+    tree parameters and the option price as plain floats.
+    """
+    S0 = float(S0)
+    K = float(K)
+    T = float(T)
+    sigma = float(sigma)
+    steps = int(steps)
+    if S0 <= 0.0 or K <= 0.0:
+        raise ValueError("S0 and K must be positive")
+    if T <= 0.0:
+        raise ValueError("T must be positive")
+    if sigma <= 0.0:
+        raise ValueError("sigma must be positive")
+    if steps < 1:
+        raise ValueError("steps must be at least 1")
+
+    price = binomial_put_pricing(S0, K, T, float(r), sigma, steps, bool(is_american))
+    u, d, p = build_crr_parameters(sigma, float(r), T / steps)
+    return {
+        "price": float(price),
+        "is_american": bool(is_american),
+        "steps": steps,
+        "u": float(u),
+        "d": float(d),
+        "p": float(p),
+    }
 
 
 if __name__ == "__main__":

@@ -1,3 +1,10 @@
+"""Empirical tail dependence estimation.
+
+Non-parametric lower/upper tail dependence coefficients from two uniform
+marginal series: lambda_lower ~ C(q, q)/q and lambda_upper ~
+bar_C(1-q, 1-q)/(1-q) estimated from joint exceedance counts.
+"""
+
 import numpy as np
 
 
@@ -30,6 +37,40 @@ def calculate_empirical_tail_dependence(u1, u2, q_lower=0.05, q_upper=0.95):
         ),  # Capped at 1.0 for probability bounds
         "Threshold (q_upper)": q_upper,
         "Empirical Upper Tail Dependence": min(lambda_upper, 1.0),
+    }
+
+
+def compute(u1, u2, q_lower: float = 0.05, q_upper: float = 0.95) -> dict:
+    """Standard facade: empirical tail dependence as a JSON dict.
+
+    Parameters:
+    u1: 1-D array-like of uniform marginals for the first variable.
+    u2: 1-D array-like of uniform marginals for the second, same length.
+    q_lower (float): Lower tail threshold in (0, 0.5].
+    q_upper (float): Upper tail threshold in [0.5, 1).
+
+    Returns:
+    dict: {"n", "q_lower", "lower_tail_dependence", "q_upper",
+    "upper_tail_dependence"} with plain floats.
+    """
+    u1 = np.asarray(u1, dtype=float).ravel()
+    u2 = np.asarray(u2, dtype=float).ravel()
+    q_lower = float(q_lower)
+    q_upper = float(q_upper)
+    if u1.size != u2.size or u1.size < 2:
+        raise ValueError("u1 and u2 must have equal length >= 2")
+    if not 0.0 < q_lower <= 0.5:
+        raise ValueError("q_lower must be in (0, 0.5]")
+    if not 0.5 <= q_upper < 1.0:
+        raise ValueError("q_upper must be in [0.5, 1)")
+
+    results = calculate_empirical_tail_dependence(u1, u2, q_lower, q_upper)
+    return {
+        "n": int(u1.size),
+        "q_lower": float(results["Threshold (q_lower)"]),
+        "lower_tail_dependence": float(results["Empirical Lower Tail Dependence"]),
+        "q_upper": float(results["Threshold (q_upper)"]),
+        "upper_tail_dependence": float(results["Empirical Upper Tail Dependence"]),
     }
 
 

@@ -1,3 +1,11 @@
+"""Binomial asset price evolution.
+
+N-step binomial tree enumeration: the terminal price after m up moves is
+S0 u^m d^(N-m) with binomial probability C(N,m) p^m (1-p)^(N-m); the
+expected terminal price is the probability-weighted sum
+(Example I.3.4, Alexander 2008).
+"""
+
 import math
 
 
@@ -41,6 +49,51 @@ def binomial_asset_evolution(S0, u, d, p, days):
         )
 
     return results, expected_price
+
+
+def compute(S0: float, u: float, d: float, p: float, days: int) -> dict:
+    """Standard facade: binomial terminal distribution as a JSON dict.
+
+    Parameters:
+    S0 (float): Initial stock price, positive.
+    u (float): Multiplicative up factor, positive.
+    d (float): Multiplicative down factor, positive.
+    p (float): Probability of an up move, in [0, 1].
+    days (int): Number of steps N (>= 1, capped at 30 to keep the
+    enumeration tractable).
+
+    Returns:
+    dict: {"s0", "days", "expected_price", "outcomes"} where outcomes is a
+    list of {"up_moves", "price", "paths", "probability"} per terminal
+    node.
+    """
+    S0 = float(S0)
+    u = float(u)
+    d = float(d)
+    p = float(p)
+    days = int(days)
+    if S0 <= 0.0 or u <= 0.0 or d <= 0.0:
+        raise ValueError("S0, u and d must be positive")
+    if not 0.0 <= p <= 1.0:
+        raise ValueError("p must lie in [0, 1]")
+    if not 1 <= days <= 30:
+        raise ValueError("days must be between 1 and 30")
+
+    outcomes, expected_price = binomial_asset_evolution(S0, u, d, p, days)
+    return {
+        "s0": S0,
+        "days": days,
+        "expected_price": float(expected_price),
+        "outcomes": [
+            {
+                "up_moves": int(o["Up_Moves"]),
+                "price": float(o["Price"]),
+                "paths": int(o["Paths"]),
+                "probability": float(o["Probability"]),
+            }
+            for o in outcomes
+        ],
+    }
 
 
 # --- Testing with Example I.3.4 from the text ---

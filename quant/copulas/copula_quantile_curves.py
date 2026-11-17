@@ -1,3 +1,10 @@
+"""Copula quantile curves.
+
+Explicit q-quantile curves u2(q | u1) for the Gaussian (Equation II.6.62),
+Student-t (II.6.69) and Clayton (II.6.74) copulas, plus numerical inversion
+of the Gumbel conditional distribution via Brent's method (Alexander 2008).
+"""
+
 import numpy as np
 import scipy.stats as stats
 from scipy.optimize import brentq
@@ -71,3 +78,52 @@ def gumbel_quantile_curve_numerical(q, u1, delta):
         return u2_solution
     except ValueError:
         return np.nan  # Failsafe if the root is not found within the bounds
+
+
+def compute(
+    q: float,
+    u1: float,
+    model: str = "gaussian",
+    rho: float = 0.0,
+    nu: float = 5.0,
+    alpha: float = 1.0,
+) -> dict:
+    """Standard facade: copula q-quantile curve value as a JSON dict.
+
+    Parameters:
+    q (float): Confidence level in (0, 1).
+    u1 (float): Conditioning uniform value of the first variable, in (0, 1).
+    model (str): "gaussian", "student_t" or "clayton".
+    rho (float): Correlation for "gaussian"/"student_t", |rho| < 1.
+    nu (float): Degrees of freedom for "student_t", positive.
+    alpha (float): Dependence parameter for "clayton", positive.
+
+    Returns:
+    dict: {"model", "q", "u1", "u2"} where u2 is the q-quantile of the
+    conditional distribution of U2 given U1 = u1.
+    """
+    q = float(q)
+    u1 = float(u1)
+    if not 0.0 < q < 1.0:
+        raise ValueError("q must lie in the open interval (0, 1)")
+    if not 0.0 < u1 < 1.0:
+        raise ValueError("u1 must lie in the open interval (0, 1)")
+
+    if model == "gaussian":
+        if not -1.0 < float(rho) < 1.0:
+            raise ValueError("rho must satisfy |rho| < 1")
+        u2 = gaussian_quantile_curve(q, u1, float(rho))
+    elif model == "student_t":
+        if not -1.0 < float(rho) < 1.0:
+            raise ValueError("rho must satisfy |rho| < 1")
+        if float(nu) <= 0.0:
+            raise ValueError("nu must be positive")
+        u2 = student_t_quantile_curve(q, u1, float(rho), float(nu))
+    elif model == "clayton":
+        if float(alpha) <= 0.0:
+            raise ValueError("alpha must be positive")
+        u2 = clayton_quantile_curve(q, u1, float(alpha))
+    else:
+        raise ValueError("model must be 'gaussian', 'student_t' or 'clayton'")
+
+    return {"model": model, "q": q, "u1": u1, "u2": float(u2)}
