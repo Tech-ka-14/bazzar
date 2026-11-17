@@ -177,6 +177,35 @@ canonical mount):
 - `GET /api/auth/kite/status` → non-secret auth state `{configured,
   api_key_set, authenticated, user, login_time, expires_hint}` — never tokens
 - `POST /api/auth/kite/disconnect` → clears the session (keeps the API secret)
+- `GET /api/analytics/var?symbol=INFY&method=historical|parametric|montecarlo&confidence=0.99`
+  → `{symbol, method, confidence, var_pct, var_value, es_pct, n_obs, asOf,
+  source, cached}` — VaR + ES of the symbol's simple daily returns as
+  positive loss fractions (P7-C); `var_value` is null (no position size is
+  tracked — never fabricated)
+- `GET /api/analytics/volatility?symbol=INFY&model=ewma|garch` → `{symbol,
+  model, current_vol, annualized_vol, params, n_obs, asOf, source, cached}`
+  — current conditional daily volatility + annualized (252 trading days)
+- `POST /api/analytics/portfolio/risk` body `{"weights": {"INFY": 0.6,
+  "TCS": 0.4}, "confidence": 0.99}` → `{symbols, weights, confidence,
+  var_pct, es_pct, portfolio_volatility, undiversified_var, component_var,
+  sharpe, sortino, n_obs, asOf, source, cached}` — normal-linear portfolio
+  VaR/ES with the Euler component split; legs aligned on common dates,
+  `asOf` = latest date common to every leg; Sharpe/Sortino annualized from
+  daily portfolio returns at a zero risk-free rate
+- `GET /api/analytics/backtest/var?symbol=INFY&confidence=0.99` → `{symbol,
+  method, confidence, window, n_obs, exceptions, exception_rate,
+  expected_exceptions, kupiec: {lr, p_value, decision}, christoffersen,
+  basel_zone, asOf, source, cached}` — rolling one-day-ahead
+  historical-simulation VaR backtest; decisions at 5% significance;
+  `basel_zone` ∈ `green|amber|red`
+- Analytics failure modes (P7-C, never fabricate): unknown method/model →
+  400 `bad_request` listing the valid options; unknown symbol → 404
+  `not_found`; insufficient history → 422 `insufficient_data` (minimums:
+  250 returns for VaR/portfolio, 60 for volatility, 250-day estimation
+  window + ≥30 backtest days for the backtest). Results are cached in the
+  DuckDB `analytics_cache` table keyed by (endpoint, params, data
+  fingerprint = latest bar date + row count); a cache hit replays the
+  payload with `cached: true`, and every payload carries `asOf` + `source`.
 - All list endpoints return `null`/`[]` fields (never fabricated numbers)
   when data has not been synced yet; the UI shows an "awaiting data sync"
   state.

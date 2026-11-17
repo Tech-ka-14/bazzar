@@ -25,10 +25,15 @@ FastAPI sidecar (backend/server.py)       — local-only API, never fabricates n
   ├─ backend/fetch_daily / fetch_indices  — checkpointed, alphabetical, validated daily pulls
   │     (--provider flag; per-symbol failures → partial run, auth failure → abort)
   ├─ backend/charts.py                    — matplotlib (Agg) PNG chart renderers
+  ├─ backend/analytics.py + analytics_routes.py — P7-C quant analytics service
+  │     + /api/v1/analytics/* endpoints (dispatch via quant/api.py ONLY;
+  │       results cached in the DuckDB analytics_cache table)
   └─ backend/settings.py / logging_config.py — validated config + structured logs
 
 quant/                                    — standalone analytics library (pure functions)
   risk/ copulas/ timeseries/ portfolio/ stats/ pricing/
+  └─ quant/api.py                         — the ONLY surface backend/analytics.py
+        may call (method/model dispatch; KeyError lists valid options)
 
 archive/                                  — legacy sources, reference only, never executed
 ```
@@ -67,6 +72,21 @@ archive/                                  — legacy sources, reference only, ne
 5. `python -m backend.backup create` snapshots the whole database to
    timestamped parquet under `data/backups/` (retention: last 14 daily +
    12 monthly), `restore` imports a snapshot into a fresh file.
+
+## Quant analytics (P7-C, roadmap 7.3)
+
+`backend/analytics.py` turns the synced `daily_ohlcv` close history into
+risk numbers — VaR/ES (historical, parametric, Monte Carlo), EWMA/GARCH
+volatility, normal-linear portfolio risk with an Euler component-VaR split,
+and a rolling one-day-ahead historical-simulation VaR backtest
+(Kupiec/Christoffersen/Basel zone) — calling **only** the `quant/api.py`
+dispatch layer, never the quant modules directly. Simple daily returns;
+hard minimum-history floors (250 returns for VaR/portfolio, 60 for
+volatility, 250-day window + 30 backtest days) below which endpoints answer
+`422 insufficient_data` instead of fabricating. Results are cached in the
+`analytics_cache` DuckDB table keyed by endpoint + params + data
+fingerprint (latest bar date + row count), so a fresh ingest invalidates
+automatically; every payload carries `asOf`, `source` and `cached`.
 
 ## Schema management
 
