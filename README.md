@@ -223,6 +223,13 @@ the TradingView/lightweight-charts components:
   homepage index cards show the current value, pointwise change, and
   percentage change, and every stock search box uses dictionary-method
   search prediction (`/api/search`).
+- **Risk analytics (v1.9.0, P7)** — per-symbol VaR/ES (historical,
+  parametric, Monte Carlo), EWMA/GARCH volatility and a Kupiec/Basel-zone
+  VaR backtest in the Equity stock deep dive, plus a portfolio risk card on
+  Home (VaR/ES, Sharpe/Sortino, component-VaR bars) — all served by
+  `/api/v1/analytics/*` over the standardized `quant/` library, with
+  explicit insufficient-history/not-synced empty states and an `asOf` stamp
+  on every number (never fabricated).
 
 Setup:
 

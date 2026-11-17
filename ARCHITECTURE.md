@@ -88,6 +88,17 @@ volatility, 250-day window + 30 backtest days) below which endpoints answer
 fingerprint (latest bar date + row count), so a fresh ingest invalidates
 automatically; every payload carries `asOf`, `source` and `cached`.
 
+UI data flow (P7-D, roadmap 7.4): the renderer calls these endpoints
+through the thin wrappers in `src/api.js` (`getVar`, `getVolatility`,
+`getPortfolioRisk`, `getVarBacktest` — bearer-authed, `/api/v1` mount):
+**UI (Equity deep-dive `RiskPanel.jsx`, Home `PortfolioRiskCard.jsx`) →
+`/api/v1/analytics/*` → `backend/analytics_routes.py` →
+`backend/analytics.py` → `quant/api.py` dispatch → DuckDB
+`daily_ohlcv`/`analytics_cache`**. Non-2xx responses surface as `ApiError`
+(status + error envelope) and the panels render explicit
+insufficient-history / not-synced empty states with an `asOf` stamp on
+every number — no fabricated placeholders.
+
 ## Schema management
 
 - `backend/migrations/NNNN_*.sql` files are applied in order at startup by
